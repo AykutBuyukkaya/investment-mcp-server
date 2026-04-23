@@ -99,6 +99,28 @@ def test_execute_get_ohlcv_bars_success_and_limit() -> None:
     assert client.calls[0]["period2"] - client.calls[0]["period1"] == 4 * 60 * 60
 
 
+def test_execute_get_ohlcv_bars_preset_success() -> None:
+    client = FakeYahooClient(_payload_with_bars())
+
+    result = asyncio.run(
+        execute_get_ohlcv_bars(
+            client,
+            ticker="thyao",
+            preset="1w",
+            interval="1d",
+        )
+    )
+
+    assert result["ok"] is True
+    assert result["data"]["preset"] == "1w"
+    assert result["data"]["interval"] == "1d"
+    assert result["data"]["start"]
+    assert result["data"]["end"]
+    assert client.calls[0]["ticker"] == "THYAO.IS"
+    assert 6 * 24 * 60 * 60 <= client.calls[0]["period2"] - client.calls[0]["period1"]
+    assert client.calls[0]["period2"] - client.calls[0]["period1"] <= 8 * 24 * 60 * 60
+
+
 def test_execute_get_ohlcv_bars_invalid_time_range() -> None:
     client = FakeYahooClient(_payload_with_bars())
 
@@ -114,6 +136,42 @@ def test_execute_get_ohlcv_bars_invalid_time_range() -> None:
 
     assert result["ok"] is False
     assert result["error"]["code"] == "INVALID_TIME_RANGE"
+
+
+def test_execute_get_ohlcv_bars_rejects_missing_range() -> None:
+    client = FakeYahooClient(_payload_with_bars())
+
+    result = asyncio.run(
+        execute_get_ohlcv_bars(
+            client,
+            ticker="THYAO",
+            interval="1d",
+        )
+    )
+
+    assert result["ok"] is False
+    assert result["error"]["code"] == "INVALID_INPUT"
+    assert client.calls == []
+
+
+def test_execute_get_ohlcv_bars_rejects_preset_with_range() -> None:
+    client = FakeYahooClient(_payload_with_bars())
+    now = datetime.now(IST)
+
+    result = asyncio.run(
+        execute_get_ohlcv_bars(
+            client,
+            ticker="THYAO",
+            start=_fmt_ist(now - timedelta(days=2)),
+            end=_fmt_ist(now - timedelta(days=1)),
+            preset="1w",
+            interval="1d",
+        )
+    )
+
+    assert result["ok"] is False
+    assert result["error"]["code"] == "INVALID_INPUT"
+    assert client.calls == []
 
 
 def test_execute_get_ohlcv_bars_include_null_bars() -> None:

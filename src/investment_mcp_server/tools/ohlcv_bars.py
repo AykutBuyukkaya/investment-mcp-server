@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 import time
-from typing import Any, Protocol
+from typing import Any, Literal, Protocol
 from zoneinfo import ZoneInfo
 
 from investment_mcp_server.errors import (
@@ -22,6 +22,16 @@ DATE_INPUT_FORMAT = "%d.%m.%Y %H.%M"
 MARKET_TIMEZONE = ZoneInfo("Europe/Istanbul")
 INTRADAY_INTERVALS = {"1m", "2m", "5m", "15m", "30m", "60m", "90m", "1h", "4h"}
 INTRADAY_MAX_AGE_SECONDS = 60 * 24 * 60 * 60
+Preset = Literal["1w", "1mo", "3mo", "6mo", "1y", "5y"]
+VALID_PRESETS: set[Preset] = {"1w", "1mo", "3mo", "6mo", "1y", "5y"}
+PRESET_DAYS: dict[Preset, int] = {
+    "1w": 7,
+    "1mo": 30,
+    "3mo": 90,
+    "6mo": 180,
+    "1y": 365,
+    "5y": 1825,
+}
 
 
 class YahooChartClient(Protocol):
@@ -76,6 +86,46 @@ def _parse_datetime_to_unix(value: str, *, field_name: str) -> int:
     return int(aware.timestamp())
 
 
+def _validate_preset(preset: str | None) -> Preset | None:
+    if preset is None:
+        return None
+    if not isinstance(preset, str) or not preset.strip():
+        raise InputError("preset must be a non-empty string")
+    normalized = preset.strip().lower()
+    if normalized not in VALID_PRESETS:
+        allowed = ", ".join(sorted(VALID_PRESETS))
+        raise InputError(f"Unsupported preset '{preset}'. Valid presets: {allowed}")
+    return normalized  # type: ignore[return-value]
+
+
+def _resolve_datetime_range(
+    *,
+    preset: Preset | None,
+    start: str | None,
+    end: str | None,
+) -> tuple[str, str, int, int]:
+    has_datetime_range = start is not None or end is not None
+    if preset is None and not has_datetime_range:
+        raise InputError("Provide either a preset or both start and end")
+    if preset is not None and has_datetime_range:
+        raise InputError("preset cannot be combined with start or end")
+    if (start is None) != (end is None):
+        raise InputError("start and end must be provided together")
+
+    if preset is not None:
+        end_dt = datetime.now(MARKET_TIMEZONE)
+        start_dt = end_dt - timedelta(days=PRESET_DAYS[preset])
+        start_text = start_dt.strftime(DATE_INPUT_FORMAT)
+        end_text = end_dt.strftime(DATE_INPUT_FORMAT)
+        return start_text, end_text, int(start_dt.timestamp()), int(end_dt.timestamp())
+
+    assert start is not None
+    assert end is not None
+    start_ts = _parse_datetime_to_unix(start, field_name="start")
+    end_ts = _parse_datetime_to_unix(end, field_name="end")
+    return start.strip(), end.strip(), start_ts, end_ts
+
+
 def _validate_inputs(start_ts: int, end_ts: int, interval: str, limit: int | None) -> None:
     if end_ts <= start_ts:
         raise InvalidTimeRangeError("end must be greater than start")
@@ -96,9 +146,10 @@ async def execute_get_ohlcv_bars(
     yahoo_client: YahooChartClient,
     *,
     ticker: str,
-    start: str,
-    end: str,
-    interval: str,
+    start: str | None = None,
+    end: str | None = None,
+    preset: str | None = None,
+    interval: str = "1d",
     include_prepost: bool = False,
     include_null_bars: bool = False,
     strict_alignment: bool = True,
@@ -106,8 +157,12 @@ async def execute_get_ohlcv_bars(
 ) -> dict[str, Any]:
     """Fetch and return parsed OHLCV bars in a standard envelope."""
     try:
-        start_ts = _parse_datetime_to_unix(start, field_name="start")
-        end_ts = _parse_datetime_to_unix(end, field_name="end")
+        normalized_preset = _validate_preset(preset)
+        resolved_start, resolved_end, start_ts, end_ts = _resolve_datetime_range(
+            preset=normalized_preset,
+            start=start,
+            end=end,
+        )
         normalized_interval = normalize_interval(interval)
         _validate_inputs(start_ts=start_ts, end_ts=end_ts, interval=normalized_interval, limit=limit)
         normalized_ticker = normalize_ticker(ticker)
@@ -135,6 +190,9 @@ async def execute_get_ohlcv_bars(
             {
                 "normalized_ticker": normalized_ticker,
                 "interval": normalized_interval,
+                "preset": normalized_preset,
+                "start": resolved_start,
+                "end": resolved_end,
                 "timezone": quote_meta.timezone,
                 "bars": [bar.to_dict() for bar in bars],
                 "dropped_null_bar_count": dropped_null_bar_count,

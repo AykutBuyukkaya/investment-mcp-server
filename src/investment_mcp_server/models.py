@@ -103,6 +103,58 @@ class GoldPriceSummary:
 
 
 @dataclass(frozen=True, slots=True)
+class FundPricePoint:
+    date: str
+    price: float
+    fund_code: str | None = None
+    fund_name: str | None = None
+    outstanding_shares: float | None = None
+    investor_count: int | None = None
+    portfolio_size: float | None = None
+    exchange_bulletin_price: float | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "date": self.date,
+            "price": self.price,
+            "fund_code": self.fund_code,
+            "fund_name": self.fund_name,
+            "outstanding_shares": self.outstanding_shares,
+            "investor_count": self.investor_count,
+            "portfolio_size": self.portfolio_size,
+            "exchange_bulletin_price": self.exchange_bulletin_price,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class FundPriceSummary:
+    fund_code: str
+    fund_name: str | None
+    opening_price: float
+    closing_price: float
+    average_price: float
+    total_return_percent: float | None
+    annualized_return_percent: float | None
+    start_date: str
+    end_date: str
+    point_count: int
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "fund_code": self.fund_code,
+            "fund_name": self.fund_name,
+            "opening_price": self.opening_price,
+            "closing_price": self.closing_price,
+            "average_price": self.average_price,
+            "total_return_percent": self.total_return_percent,
+            "annualized_return_percent": self.annualized_return_percent,
+            "start_date": self.start_date,
+            "end_date": self.end_date,
+            "point_count": self.point_count,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class SessionPeriod:
     timezone: str | None = None
     start: int | None = None

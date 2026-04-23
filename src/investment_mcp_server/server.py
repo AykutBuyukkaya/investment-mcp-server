@@ -6,7 +6,10 @@ from mcp.server.fastmcp import FastMCP
 from pydantic import Field
 
 from investment_mcp_server.settings import Settings
+from investment_mcp_server.fund_client import DirectFundClient
 from investment_mcp_server.gold_client import DirectGoldClient
+from investment_mcp_server.tools.fund_price_data import FundPriceClient
+from investment_mcp_server.tools.fund_price_data import execute_get_fund_price_data
 from investment_mcp_server.tools.gold_price_data import execute_get_gold_price_data
 from investment_mcp_server.tools.gold_price_data import GoldPriceClient
 from investment_mcp_server.tools.ohlcv_bars import execute_get_ohlcv_bars
@@ -21,19 +24,21 @@ LOGGER = logging.getLogger(__name__)
 def create_server(
     yahoo_client: YahooClient | None = None,
     gold_client: GoldPriceClient | None = None,
+    fund_client: FundPriceClient | None = None,
     settings: Settings | None = None,
 ) -> FastMCP:
     """Create the MCP server and register all tools/resources/prompts."""
     resolved_settings = settings or Settings()
     client = yahoo_client or YahooClient(settings=resolved_settings)
     resolved_gold_client = gold_client or DirectGoldClient()
+    resolved_fund_client = fund_client or DirectFundClient()
 
     mcp = FastMCP(
         name="investment-mcp-server",
         instructions=(
             "Investment MCP server with BIST market data tools backed by Yahoo Finance "
-            "and gold price data backed by direct Canli Doviz provider calls. BIST tickers "
-            "are normalized to Yahoo's .IS suffix."
+            "plus direct Canli Doviz gold data and direct TEFAS fund data. BIST tickers are "
+            "normalized to Yahoo's .IS suffix."
         ),
         log_level=resolved_settings.log_level,
         stateless_http=True,
@@ -73,6 +78,7 @@ def create_server(
         name="get_ohlcv_bars",
         description=(
             "Fetch time-series OHLCV candles for a BIST symbol from Yahoo Finance. Supports "
+            "preset windows (1w, 1mo, 3mo, 6mo, 1y, 5y) or explicit Istanbul-time start/end, "
             "strict alignment checks, null-bar filtering, and optional output limiting. Returns "
             "bars with Unix timestamp and ISO UTC datetime in a standard envelope: {ok, data, error}."
         ),
@@ -84,19 +90,31 @@ def create_server(
                 "uppercase with .IS suffix before querying Yahoo."
             )
         ),
-        start: str = Field(
+        start: str | None = Field(
+            default=None,
             description=(
-                "Start datetime in format dd.mm.yyyy hh.MM using Europe/Istanbul timezone. "
+                "Optional start datetime in format dd.mm.yyyy hh.MM using Europe/Istanbul "
+                "timezone. Must be supplied with end and cannot be combined with preset. "
                 "Example: 01.01.2024 09.30"
             )
         ),
-        end: str = Field(
+        end: str | None = Field(
+            default=None,
             description=(
-                "End datetime in format dd.mm.yyyy hh.MM using Europe/Istanbul timezone. "
-                "Must be later than start. Example: 31.01.2024 18.00"
+                "Optional end datetime in format dd.mm.yyyy hh.MM using Europe/Istanbul "
+                "timezone. Must be supplied with start and cannot be combined with preset. "
+                "Example: 31.01.2024 18.00"
             )
         ),
+        preset: str | None = Field(
+            default=None,
+            description=(
+                "Optional preset window. Supported values: 1w, 1mo, 3mo, 6mo, 1y, 5y. "
+                "Cannot be combined with start/end."
+            ),
+        ),
         interval: str = Field(
+            default="1d",
             description=(
                 "Requested candle granularity. Supported values include 1m, 5m, 15m, 1h, 1d, "
                 "1wk, and 1mo. Use values Yahoo supports for the requested time span."
@@ -132,6 +150,7 @@ def create_server(
             ticker=ticker,
             start=start,
             end=end,
+            preset=preset,
             interval=interval,
             include_prepost=include_prepost,
             include_null_bars=include_null_bars,
@@ -181,6 +200,50 @@ def create_server(
             end_date=end_date,
         )
 
+    @mcp.tool(
+        name="get_fund_price_data",
+        description=(
+            "Fetch daily TEFAS mutual fund price data for a fund code over a date range. "
+            "Accepts the same preset windows as gold and stocks (1w, 1mo, 3mo, 6mo, 1y, 5y) "
+            "or explicit start_date/end_date. "
+            "Returns price points plus opening, closing, average, total return, and "
+            "annualized return in the standard envelope: {ok, data, error}."
+        ),
+    )
+    async def get_fund_price_data(
+        fund_code: str = Field(
+            description="TEFAS fund code, for example AFT, NNF, or TCD.",
+        ),
+        preset: str | None = Field(
+            default=None,
+            description=(
+                "Optional preset window. Supported values: 1w, 1mo, 3mo, 6mo, 1y, 5y. "
+                "Cannot be combined with start_date/end_date."
+            ),
+        ),
+        start_date: str | None = Field(
+            default=None,
+            description=(
+                "Optional start date in YYYY-MM-DD format. Must be supplied with end_date and "
+                "cannot be combined with preset."
+            ),
+        ),
+        end_date: str | None = Field(
+            default=None,
+            description=(
+                "Optional end date in YYYY-MM-DD format. Must be supplied with start_date and "
+                "cannot be combined with preset."
+            ),
+        ),
+    ) -> dict[str, Any]:
+        return await execute_get_fund_price_data(
+            resolved_fund_client,
+            fund_code=fund_code,
+            preset=preset,
+            start_date=start_date,
+            end_date=end_date,
+        )
+
     @mcp.resource("config://server")
     def server_config() -> dict[str, str]:
         """Expose minimal server metadata."""
@@ -188,8 +251,8 @@ def create_server(
             "name": "investment-mcp-server",
             "version": "0.1.0",
             "status": "ready",
-            "market_data_provider": "Yahoo Finance, Canli Doviz",
-            "market": "BIST, gold",
+            "market_data_provider": "Yahoo Finance, Canli Doviz, TEFAS",
+            "market": "BIST, gold, funds",
         }
 
     @mcp.prompt()
@@ -246,7 +309,13 @@ def main() -> None:
 
     yahoo_client = YahooClient(settings=settings)
     gold_client = DirectGoldClient()
-    server = create_server(yahoo_client=yahoo_client, gold_client=gold_client, settings=settings)
+    fund_client = DirectFundClient()
+    server = create_server(
+        yahoo_client=yahoo_client,
+        gold_client=gold_client,
+        fund_client=fund_client,
+        settings=settings,
+    )
 
     LOGGER.info("Starting investment MCP server on %s transport", transport)
     try:
@@ -254,6 +323,7 @@ def main() -> None:
     finally:
         _close_yahoo_client_sync(yahoo_client)
         _close_gold_client_sync(gold_client)
+        _close_gold_client_sync(fund_client)
         LOGGER.info("Yahoo HTTP client closed")
 
 
