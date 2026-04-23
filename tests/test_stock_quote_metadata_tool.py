@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import asyncio
 
-from investment_mcp_server.tools.quote_metadata import execute_get_quote_metadata
+from investment_mcp_server.tools.stock_quote_metadata import execute_get_stock_quote_metadata
 
 
-class FakeYahooClient:
+class FakeStockClient:
     def __init__(self, payload: dict):
         self.payload = payload
         self.calls: list[dict] = []
@@ -54,11 +54,11 @@ def _success_payload() -> dict:
     }
 
 
-def test_execute_get_quote_metadata_success() -> None:
-    client = FakeYahooClient(_success_payload())
+def test_execute_get_stock_quote_metadata_success() -> None:
+    client = FakeStockClient(_success_payload())
 
     result = asyncio.run(
-        execute_get_quote_metadata(
+        execute_get_stock_quote_metadata(
             client,
             ticker="thyao",
             include_prepost=False,
@@ -72,11 +72,11 @@ def test_execute_get_quote_metadata_success() -> None:
     assert client.calls[0]["interval"] == "1d"
 
 
-def test_execute_get_quote_metadata_invalid_ticker() -> None:
-    client = FakeYahooClient(_success_payload())
+def test_execute_get_stock_quote_metadata_invalid_ticker() -> None:
+    client = FakeStockClient(_success_payload())
 
     result = asyncio.run(
-        execute_get_quote_metadata(
+        execute_get_stock_quote_metadata(
             client,
             ticker="THYAO.US",
             include_prepost=False,

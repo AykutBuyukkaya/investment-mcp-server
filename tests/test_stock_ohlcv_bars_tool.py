@@ -4,7 +4,7 @@ import asyncio
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from investment_mcp_server.tools.ohlcv_bars import execute_get_ohlcv_bars
+from investment_mcp_server.tools.stock_ohlcv_bars import execute_get_stock_ohlcv_bars
 
 
 IST = ZoneInfo("Europe/Istanbul")
@@ -14,7 +14,7 @@ def _fmt_ist(dt: datetime) -> str:
     return dt.astimezone(IST).strftime("%d.%m.%Y %H.%M")
 
 
-class FakeYahooClient:
+class FakeStockClient:
     def __init__(self, payload: dict):
         self.payload = payload
         self.calls: list[dict] = []
@@ -67,14 +67,14 @@ def _payload_with_bars() -> dict:
     }
 
 
-def test_execute_get_ohlcv_bars_success_and_limit() -> None:
-    client = FakeYahooClient(_payload_with_bars())
+def test_execute_get_stock_ohlcv_bars_success_and_limit() -> None:
+    client = FakeStockClient(_payload_with_bars())
     now = datetime.now(IST)
     start = _fmt_ist(now - timedelta(days=2))
     end = _fmt_ist(now - timedelta(days=1, hours=20))
 
     result = asyncio.run(
-        execute_get_ohlcv_bars(
+        execute_get_stock_ohlcv_bars(
             client,
             ticker="thyao",
             start=start,
@@ -99,11 +99,11 @@ def test_execute_get_ohlcv_bars_success_and_limit() -> None:
     assert client.calls[0]["period2"] - client.calls[0]["period1"] == 4 * 60 * 60
 
 
-def test_execute_get_ohlcv_bars_preset_success() -> None:
-    client = FakeYahooClient(_payload_with_bars())
+def test_execute_get_stock_ohlcv_bars_preset_success() -> None:
+    client = FakeStockClient(_payload_with_bars())
 
     result = asyncio.run(
-        execute_get_ohlcv_bars(
+        execute_get_stock_ohlcv_bars(
             client,
             ticker="thyao",
             preset="1w",
@@ -121,11 +121,11 @@ def test_execute_get_ohlcv_bars_preset_success() -> None:
     assert client.calls[0]["period2"] - client.calls[0]["period1"] <= 8 * 24 * 60 * 60
 
 
-def test_execute_get_ohlcv_bars_invalid_time_range() -> None:
-    client = FakeYahooClient(_payload_with_bars())
+def test_execute_get_stock_ohlcv_bars_invalid_time_range() -> None:
+    client = FakeStockClient(_payload_with_bars())
 
     result = asyncio.run(
-        execute_get_ohlcv_bars(
+        execute_get_stock_ohlcv_bars(
             client,
             ticker="THYAO",
             start="15.11.2023 10.00",
@@ -138,11 +138,11 @@ def test_execute_get_ohlcv_bars_invalid_time_range() -> None:
     assert result["error"]["code"] == "INVALID_TIME_RANGE"
 
 
-def test_execute_get_ohlcv_bars_rejects_missing_range() -> None:
-    client = FakeYahooClient(_payload_with_bars())
+def test_execute_get_stock_ohlcv_bars_rejects_missing_range() -> None:
+    client = FakeStockClient(_payload_with_bars())
 
     result = asyncio.run(
-        execute_get_ohlcv_bars(
+        execute_get_stock_ohlcv_bars(
             client,
             ticker="THYAO",
             interval="1d",
@@ -154,12 +154,12 @@ def test_execute_get_ohlcv_bars_rejects_missing_range() -> None:
     assert client.calls == []
 
 
-def test_execute_get_ohlcv_bars_rejects_preset_with_range() -> None:
-    client = FakeYahooClient(_payload_with_bars())
+def test_execute_get_stock_ohlcv_bars_rejects_preset_with_range() -> None:
+    client = FakeStockClient(_payload_with_bars())
     now = datetime.now(IST)
 
     result = asyncio.run(
-        execute_get_ohlcv_bars(
+        execute_get_stock_ohlcv_bars(
             client,
             ticker="THYAO",
             start=_fmt_ist(now - timedelta(days=2)),
@@ -174,14 +174,14 @@ def test_execute_get_ohlcv_bars_rejects_preset_with_range() -> None:
     assert client.calls == []
 
 
-def test_execute_get_ohlcv_bars_include_null_bars() -> None:
-    client = FakeYahooClient(_payload_with_bars())
+def test_execute_get_stock_ohlcv_bars_include_null_bars() -> None:
+    client = FakeStockClient(_payload_with_bars())
     now = datetime.now(IST)
     start = _fmt_ist(now - timedelta(days=2))
     end = _fmt_ist(now - timedelta(days=1, hours=20))
 
     result = asyncio.run(
-        execute_get_ohlcv_bars(
+        execute_get_stock_ohlcv_bars(
             client,
             ticker="THYAO",
             start=start,
@@ -196,11 +196,11 @@ def test_execute_get_ohlcv_bars_include_null_bars() -> None:
     assert result["data"]["dropped_null_bar_count"] == 0
 
 
-def test_execute_get_ohlcv_bars_invalid_interval() -> None:
-    client = FakeYahooClient(_payload_with_bars())
+def test_execute_get_stock_ohlcv_bars_invalid_interval() -> None:
+    client = FakeStockClient(_payload_with_bars())
 
     result = asyncio.run(
-        execute_get_ohlcv_bars(
+        execute_get_stock_ohlcv_bars(
             client,
             ticker="THYAO",
             start="14.11.2023 23.13",
@@ -213,14 +213,14 @@ def test_execute_get_ohlcv_bars_invalid_interval() -> None:
     assert result["error"]["code"] == "INVALID_INTERVAL"
 
 
-def test_execute_get_ohlcv_bars_daily_interval_not_limited_to_60_days() -> None:
-    client = FakeYahooClient(_payload_with_bars())
+def test_execute_get_stock_ohlcv_bars_daily_interval_not_limited_to_60_days() -> None:
+    client = FakeStockClient(_payload_with_bars())
     now = datetime.now(IST)
     start = _fmt_ist(now - timedelta(days=120))
     end = _fmt_ist(now - timedelta(days=100))
 
     result = asyncio.run(
-        execute_get_ohlcv_bars(
+        execute_get_stock_ohlcv_bars(
             client,
             ticker="THYAO",
             start=start,

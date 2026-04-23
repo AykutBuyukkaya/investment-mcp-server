@@ -1,4 +1,4 @@
-"""Async Yahoo Finance chart API client with retry and timeout handling."""
+"""Async stock data provider client with retry and timeout handling."""
 
 from __future__ import annotations
 
@@ -15,8 +15,8 @@ from investment_mcp_server.settings import Settings
 RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
 
 
-class YahooClient:
-    """Lifecycle-friendly async client for Yahoo chart API requests."""
+class YahooStockClient:
+    """Lifecycle-friendly async client for Yahoo Finance stock chart API requests."""
 
     def __init__(
         self,
@@ -27,7 +27,7 @@ class YahooClient:
         self._owned_client = async_client is None
         self._client = async_client
 
-    async def __aenter__(self) -> "YahooClient":
+    async def __aenter__(self) -> "YahooStockClient":
         await self.start()
         return self
 
@@ -105,7 +105,7 @@ class YahooClient:
         if last_exception is not None:
             raise last_exception
 
-        raise RuntimeError("Unexpected retry state in YahooClient.fetch_chart")
+        raise RuntimeError("Unexpected retry state in YahooStockClient.fetch_chart")
 
     async def _sleep_backoff(self, attempt: int) -> None:
         base = self._settings.yf_retry_backoff_base

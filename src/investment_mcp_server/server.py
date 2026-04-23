@@ -12,9 +12,9 @@ from investment_mcp_server.tools.fund_price_data import FundPriceClient
 from investment_mcp_server.tools.fund_price_data import execute_get_fund_price_data
 from investment_mcp_server.tools.gold_price_data import execute_get_gold_price_data
 from investment_mcp_server.tools.gold_price_data import GoldPriceClient
-from investment_mcp_server.tools.ohlcv_bars import execute_get_ohlcv_bars
-from investment_mcp_server.tools.quote_metadata import execute_get_quote_metadata
-from investment_mcp_server.yahoo_client import YahooClient
+from investment_mcp_server.tools.stock_ohlcv_bars import execute_get_stock_ohlcv_bars
+from investment_mcp_server.tools.stock_quote_metadata import execute_get_stock_quote_metadata
+from investment_mcp_server.stock_client import YahooStockClient
 
 Transport = Literal["stdio", "sse", "streamable-http"]
 
@@ -22,14 +22,14 @@ LOGGER = logging.getLogger(__name__)
 
 
 def create_server(
-    yahoo_client: YahooClient | None = None,
+    stock_client: YahooStockClient | None = None,
     gold_client: GoldPriceClient | None = None,
     fund_client: FundPriceClient | None = None,
     settings: Settings | None = None,
 ) -> FastMCP:
     """Create the MCP server and register all tools/resources/prompts."""
     resolved_settings = settings or Settings()
-    client = yahoo_client or YahooClient(settings=resolved_settings)
+    resolved_stock_client = stock_client or YahooStockClient(settings=resolved_settings)
     resolved_gold_client = gold_client or DirectGoldClient()
     resolved_fund_client = fund_client or DirectFundClient()
 
@@ -46,15 +46,15 @@ def create_server(
     )
 
     @mcp.tool(
-        name="get_quote_metadata",
+        name="get_stock_quote_metadata",
         description=(
-            "Fetch high-level quote metadata for a BIST equity from Yahoo Finance chart API. "
+            "Fetch high-level stock quote metadata for a BIST equity from Yahoo Finance chart API. "
             "Use this when you need symbol-level context such as currency, exchange, regular "
             "market price, 52-week high/low, previous close, volume, timezone, and granularity. "
             "Returns a standard envelope: {ok, data, error}."
         ),
     )
-    async def get_quote_metadata(
+    async def get_stock_quote_metadata(
         ticker: str = Field(
             description=(
                 "Target BIST symbol. Accepts base symbol, e.g. THYAO, or explicit .IS symbol, "
@@ -68,22 +68,22 @@ def create_server(
             ),
         ),
     ) -> dict[str, Any]:
-        return await execute_get_quote_metadata(
-            client,
+        return await execute_get_stock_quote_metadata(
+            resolved_stock_client,
             ticker=ticker,
             include_prepost=include_prepost,
         )
 
     @mcp.tool(
-        name="get_ohlcv_bars",
+        name="get_stock_ohlcv_bars",
         description=(
-            "Fetch time-series OHLCV candles for a BIST symbol from Yahoo Finance. Supports "
+            "Fetch time-series stock OHLCV candles for a BIST symbol from Yahoo Finance. Supports "
             "preset windows (1w, 1mo, 3mo, 6mo, 1y, 5y) or explicit Istanbul-time start/end, "
             "strict alignment checks, null-bar filtering, and optional output limiting. Returns "
             "bars with Unix timestamp and ISO UTC datetime in a standard envelope: {ok, data, error}."
         ),
     )
-    async def get_ohlcv_bars(
+    async def get_stock_ohlcv_bars(
         ticker: str = Field(
             description=(
                 "Target BIST symbol. Accepts THYAO or THYAO.IS. The value is normalized to "
@@ -145,8 +145,8 @@ def create_server(
             ),
         ),
     ) -> dict[str, Any]:
-        return await execute_get_ohlcv_bars(
-            client,
+        return await execute_get_stock_ohlcv_bars(
+            resolved_stock_client,
             ticker=ticker,
             start=start,
             end=end,
@@ -251,7 +251,9 @@ def create_server(
             "name": "investment-mcp-server",
             "version": "0.1.0",
             "status": "ready",
-            "market_data_provider": "Yahoo Finance, Canli Doviz, TEFAS",
+            "stock_data_provider": "Yahoo Finance",
+            "gold_data_provider": "Canli Doviz",
+            "fund_data_provider": "TEFAS",
             "market": "BIST, gold, funds",
         }
 
@@ -276,7 +278,7 @@ def configure_logging(log_level: str) -> None:
     )
 
 
-def _close_yahoo_client_sync(client: YahooClient) -> None:
+def _close_stock_client_sync(client: YahooStockClient) -> None:
     try:
         asyncio.run(client.close())
     except RuntimeError:
@@ -307,11 +309,11 @@ def main() -> None:
     transport = _validate_transport(settings.transport)
     configure_logging(settings.log_level)
 
-    yahoo_client = YahooClient(settings=settings)
+    stock_client = YahooStockClient(settings=settings)
     gold_client = DirectGoldClient()
     fund_client = DirectFundClient()
     server = create_server(
-        yahoo_client=yahoo_client,
+        stock_client=stock_client,
         gold_client=gold_client,
         fund_client=fund_client,
         settings=settings,
@@ -321,10 +323,10 @@ def main() -> None:
     try:
         server.run(transport=transport)
     finally:
-        _close_yahoo_client_sync(yahoo_client)
+        _close_stock_client_sync(stock_client)
         _close_gold_client_sync(gold_client)
         _close_gold_client_sync(fund_client)
-        LOGGER.info("Yahoo HTTP client closed")
+        LOGGER.info("Stock HTTP client closed")
 
 
 def _validate_transport(value: str) -> Transport:

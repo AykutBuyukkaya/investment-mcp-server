@@ -1,4 +1,4 @@
-"""OHLCV bars MCP tool implementation."""
+"""Stock OHLCV bars MCP tool implementation."""
 
 from __future__ import annotations
 
@@ -34,7 +34,7 @@ PRESET_DAYS: dict[Preset, int] = {
 }
 
 
-class YahooChartClient(Protocol):
+class StockChartClient(Protocol):
     async def fetch_chart(
         self,
         ticker: str,
@@ -142,8 +142,8 @@ def _validate_inputs(start_ts: int, end_ts: int, interval: str, limit: int | Non
         raise InputError("limit must be greater than 0 when provided")
 
 
-async def execute_get_ohlcv_bars(
-    yahoo_client: YahooChartClient,
+async def execute_get_stock_ohlcv_bars(
+    stock_client: StockChartClient,
     *,
     ticker: str,
     start: str | None = None,
@@ -167,7 +167,7 @@ async def execute_get_ohlcv_bars(
         _validate_inputs(start_ts=start_ts, end_ts=end_ts, interval=normalized_interval, limit=limit)
         normalized_ticker = normalize_ticker(ticker)
 
-        raw = await yahoo_client.fetch_chart(
+        raw = await stock_client.fetch_chart(
             ticker=normalized_ticker,
             period1=start_ts,
             period2=end_ts,

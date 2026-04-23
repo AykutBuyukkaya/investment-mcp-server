@@ -1,4 +1,4 @@
-"""Quote metadata MCP tool implementation."""
+"""Stock quote metadata MCP tool implementation."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from investment_mcp_server.errors import (
 from investment_mcp_server.parsers import normalize_ticker, parse_quote_meta
 
 
-class YahooChartClient(Protocol):
+class StockChartClient(Protocol):
     async def fetch_chart(
         self,
         ticker: str,
@@ -84,8 +84,8 @@ def _make_error_response(exc: Exception) -> dict[str, Any]:
     return {"ok": False, "data": None, "error": payload.to_dict()}
 
 
-async def execute_get_quote_metadata(
-    yahoo_client: YahooChartClient,
+async def execute_get_stock_quote_metadata(
+    stock_client: StockChartClient,
     *,
     ticker: str,
     include_prepost: bool = False,
@@ -95,7 +95,7 @@ async def execute_get_quote_metadata(
         normalized_ticker = normalize_ticker(ticker)
         period1, period2 = _resolve_period(DEFAULT_METADATA_RANGE)
 
-        raw = await yahoo_client.fetch_chart(
+        raw = await stock_client.fetch_chart(
             ticker=normalized_ticker,
             period1=period1,
             period2=period2,
