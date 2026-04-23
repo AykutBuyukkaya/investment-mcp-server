@@ -96,6 +96,25 @@ def _gold_price_summary(
     )
 
 
+def _latest_gold_price(
+    *,
+    asset: str,
+    currency: str,
+    bars: list[GoldHistoricalBar],
+) -> dict[str, Any]:
+    for bar in reversed(bars):
+        price = bar.close if bar.close is not None else bar.open
+        if price is not None:
+            return {
+                "asset": asset,
+                "source": "canlidoviz",
+                "current_price": price,
+                "currency": currency,
+                "date": bar.date,
+            }
+    raise InputError("No gold bars with a usable current price are available")
+
+
 async def execute_get_gold_price_data(
     gold_client: GoldPriceClient,
     *,
@@ -103,13 +122,24 @@ async def execute_get_gold_price_data(
     preset: str | None = None,
     start_date: str | None = None,
     end_date: str | None = None,
+    current_price: bool = False,
 ) -> dict[str, Any]:
     """Fetch daily gold price data in a standard envelope."""
     try:
+        normalized_asset = normalize_gold_asset(asset)
+        if current_price:
+            bars = await gold_client.get_history(normalized_asset.code, preset="1w")
+            return _make_success_response(
+                _latest_gold_price(
+                    asset=normalized_asset.code,
+                    currency=normalized_asset.currency,
+                    bars=bars,
+                )
+            )
+
         normalized_preset = _validate_preset(preset)
         normalized_start_date = _validate_date(start_date, field_name="start_date")
         normalized_end_date = _validate_date(end_date, field_name="end_date")
-        normalized_asset = normalize_gold_asset(asset)
 
         has_date_range = normalized_start_date is not None or normalized_end_date is not None
         if normalized_preset is None and not has_date_range:

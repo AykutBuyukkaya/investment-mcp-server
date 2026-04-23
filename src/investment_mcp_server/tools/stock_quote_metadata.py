@@ -89,6 +89,7 @@ async def execute_get_stock_quote_metadata(
     *,
     ticker: str,
     include_prepost: bool = False,
+    current_price: bool = False,
 ) -> dict[str, Any]:
     """Fetch and return normalized quote metadata wrapped in a standard envelope."""
     try:
@@ -105,6 +106,20 @@ async def execute_get_stock_quote_metadata(
         _raise_if_chart_error(raw)
 
         meta = parse_quote_meta(raw)
+        if current_price:
+            if meta.regular_market_price is None:
+                raise NoDataError(f"No current price returned for {normalized_ticker}")
+            return _make_success_response(
+                {
+                    "normalized_ticker": normalized_ticker,
+                    "source": "yahoo_finance",
+                    "current_price": meta.regular_market_price,
+                    "currency": meta.currency,
+                    "timezone": meta.timezone,
+                    "meta": meta.to_dict(),
+                }
+            )
+
         return _make_success_response(
             {
                 "normalized_ticker": normalized_ticker,

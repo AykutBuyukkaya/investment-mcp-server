@@ -15,6 +15,9 @@ from investment_mcp_server.models import Candle, MarketSessionInfo, QuoteMeta, S
 
 
 TICKER_BASE_PATTERN = re.compile(r"^[A-Z0-9]{1,10}$")
+CURRENCY_CODE_PATTERN = re.compile(r"^[A-Z]{3}$")
+CURRENCY_PAIR_PATTERN = re.compile(r"^([A-Z]{3})/?([A-Z]{3})$")
+CURRENCY_YAHOO_SYMBOL_PATTERN = re.compile(r"^([A-Z]{3}|[A-Z]{6})=X$")
 VALID_INTERVALS = (
     "1m",
     "2m",
@@ -59,6 +62,49 @@ def normalize_ticker(ticker: str) -> str:
         )
 
     return f"{base}.IS"
+
+
+def normalize_currency_pair(pair: str) -> tuple[str, str, str]:
+    """Normalize a currency pair and return (base, quote, Yahoo chart symbol)."""
+    if not isinstance(pair, str):
+        raise InvalidTickerError("Currency pair must be a string")
+
+    cleaned = pair.strip().upper().replace("-", "/")
+    if not cleaned:
+        raise InvalidTickerError("Currency pair cannot be empty")
+
+    yahoo_match = CURRENCY_YAHOO_SYMBOL_PATTERN.fullmatch(cleaned)
+    if yahoo_match:
+        symbol_base = yahoo_match.group(1)
+        if len(symbol_base) == 3:
+            base_currency = "USD"
+            quote_currency = symbol_base
+        else:
+            base_currency = symbol_base[:3]
+            quote_currency = symbol_base[3:]
+        if base_currency == quote_currency:
+            raise InvalidTickerError("Currency pair base and quote must differ")
+        return base_currency, quote_currency, cleaned
+
+    pair_match = CURRENCY_PAIR_PATTERN.fullmatch(cleaned)
+    if pair_match is None:
+        raise InvalidTickerError(
+            "Currency pair must be like USD/TRY, USDTRY, or a Yahoo symbol like TRY=X"
+        )
+
+    base_currency = pair_match.group(1)
+    quote_currency = pair_match.group(2)
+    if not CURRENCY_CODE_PATTERN.fullmatch(base_currency) or not CURRENCY_CODE_PATTERN.fullmatch(
+        quote_currency
+    ):
+        raise InvalidTickerError("Currency codes must be 3 uppercase ASCII letters")
+    if base_currency == quote_currency:
+        raise InvalidTickerError("Currency pair base and quote must differ")
+
+    yahoo_symbol = (
+        f"{quote_currency}=X" if base_currency == "USD" else f"{base_currency}{quote_currency}=X"
+    )
+    return base_currency, quote_currency, yahoo_symbol
 
 
 def normalize_interval(interval: str) -> str:

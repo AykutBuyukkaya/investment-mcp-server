@@ -1,6 +1,6 @@
 # Investment MCP Server
 
-Python MCP server for investment workflows. The current server exposes BIST stock market data tools backed by a Yahoo Finance stock provider, using `.IS` ticker normalization for Turkish stock exchange symbols, gold price data backed by direct Canli Doviz provider calls, and fund price data backed by direct TEFAS provider calls.
+Python MCP server for investment workflows. The current server exposes BIST stock market data tools backed by a Yahoo Finance stock provider, using `.IS` ticker normalization for Turkish stock exchange symbols, foreign currency data backed by Yahoo Finance FX symbols, gold price data backed by direct Canli Doviz provider calls, and fund price data backed by direct TEFAS provider calls.
 
 ## Project Layout
 
@@ -65,10 +65,11 @@ http://localhost:8000/mcp
 
 The server currently registers these MCP tools:
 
-- `get_stock_quote_metadata`: fetches stock quote metadata for a BIST symbol such as `THYAO` or `THYAO.IS`.
-- `get_stock_ohlcv_bars`: fetches stock OHLCV candles for a BIST symbol using either `preset` (`1w`, `1mo`, `3mo`, `6mo`, `1y`, `5y`) or an explicit Istanbul-time `start` plus `end` range.
-- `get_gold_price_data`: fetches daily gram gold / XAUTRY data directly from Canli Doviz and returns opening, closing, and average prices. Use either `preset` (`1w`, `1mo`, `3mo`, `6mo`, `1y`, `5y`) or `start_date` plus `end_date`.
-- `get_fund_price_data`: fetches daily TEFAS fund prices for a fund code using either `preset` (`1w`, `1mo`, `3mo`, `6mo`, `1y`, `5y`) or `start_date` plus `end_date`, and returns opening, closing, average, total return, and annualized return.
+- `get_stock_quote_metadata`: fetches stock quote metadata for a BIST symbol such as `THYAO` or `THYAO.IS`. Set `current_price=true` to fetch only the latest price from the metadata response.
+- `get_stock_ohlcv_bars`: fetches stock OHLCV candles for a BIST symbol using either `preset` (`1w`, `1mo`, `3mo`, `6mo`, `1y`, `5y`) or an explicit Istanbul-time `start` plus `end` range. Set `current_price=true` to fetch only the latest price; in that mode `preset`, `start`, and `end` are not required and are ignored when supplied.
+- `get_currency_ohlcv_bars`: fetches foreign currency OHLCV candles from Yahoo Finance using pairs such as `USD/TRY`, `USDTRY`, `EUR/TRY`, or `EURTRY`. Yahoo FX symbols such as `TRY=X` and `EURTRY=X` are also accepted. Use either `preset` (`1w`, `1mo`, `3mo`, `6mo`, `1y`, `5y`) or an explicit Istanbul-time `start` plus `end` range. Set `current_price=true` to fetch only the latest price; in that mode `preset`, `start`, and `end` are not required and are ignored when supplied.
+- `get_gold_price_data`: fetches daily gram gold / XAUTRY data directly from Canli Doviz and returns opening, closing, and average prices. Use either `preset` (`1w`, `1mo`, `3mo`, `6mo`, `1y`, `5y`) or `start_date` plus `end_date`. Set `current_price=true` to fetch only the latest price; in that mode `preset`, `start_date`, and `end_date` are not required and are ignored when supplied.
+- `get_fund_price_data`: fetches daily TEFAS fund prices for a fund code using either `preset` (`1w`, `1mo`, `3mo`, `6mo`, `1y`, `5y`) or `start_date` plus `end_date`, and returns opening, closing, average, total return, and annualized return. Set `current_price=true` to fetch only the latest price; in that mode `preset`, `start_date`, and `end_date` are not required and are ignored when supplied.
 
 Tool responses use this envelope:
 

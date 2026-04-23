@@ -121,6 +121,31 @@ def test_execute_get_stock_ohlcv_bars_preset_success() -> None:
     assert client.calls[0]["period2"] - client.calls[0]["period1"] <= 8 * 24 * 60 * 60
 
 
+def test_execute_get_stock_ohlcv_bars_current_price_ignores_range_inputs() -> None:
+    client = FakeStockClient(_payload_with_bars())
+
+    result = asyncio.run(
+        execute_get_stock_ohlcv_bars(
+            client,
+            ticker="thyao",
+            preset="not-used",
+            start="15.11.2023 10.00",
+            end="15.11.2023 09.00",
+            interval="not-used",
+            current_price=True,
+        )
+    )
+
+    assert result["ok"] is True
+    assert result["data"]["normalized_ticker"] == "THYAO.IS"
+    assert result["data"]["source"] == "yahoo_finance"
+    assert result["data"]["current_price"] == 102.5
+    assert result["data"]["timestamp"] == 1700007200
+    assert client.calls[0]["ticker"] == "THYAO.IS"
+    assert client.calls[0]["interval"] == "1m"
+    assert 4 * 24 * 60 * 60 <= client.calls[0]["period2"] - client.calls[0]["period1"]
+
+
 def test_execute_get_stock_ohlcv_bars_invalid_time_range() -> None:
     client = FakeStockClient(_payload_with_bars())
 

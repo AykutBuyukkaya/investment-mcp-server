@@ -72,6 +72,26 @@ def test_execute_get_stock_quote_metadata_success() -> None:
     assert client.calls[0]["interval"] == "1d"
 
 
+def test_execute_get_stock_quote_metadata_current_price_success() -> None:
+    client = FakeStockClient(_success_payload())
+
+    result = asyncio.run(
+        execute_get_stock_quote_metadata(
+            client,
+            ticker="thyao",
+            include_prepost=False,
+            current_price=True,
+        )
+    )
+
+    assert result["ok"] is True
+    assert result["data"]["normalized_ticker"] == "THYAO.IS"
+    assert result["data"]["source"] == "yahoo_finance"
+    assert result["data"]["current_price"] == 315.5
+    assert result["data"]["currency"] == "TRY"
+    assert result["data"]["meta"]["symbol"] == "THYAO.IS"
+
+
 def test_execute_get_stock_quote_metadata_invalid_ticker() -> None:
     client = FakeStockClient(_success_payload())
 

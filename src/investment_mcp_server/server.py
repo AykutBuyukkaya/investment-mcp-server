@@ -12,6 +12,7 @@ from investment_mcp_server.tools.fund_price_data import FundPriceClient
 from investment_mcp_server.tools.fund_price_data import execute_get_fund_price_data
 from investment_mcp_server.tools.gold_price_data import execute_get_gold_price_data
 from investment_mcp_server.tools.gold_price_data import GoldPriceClient
+from investment_mcp_server.tools.currency_ohlcv_bars import execute_get_currency_ohlcv_bars
 from investment_mcp_server.tools.stock_ohlcv_bars import execute_get_stock_ohlcv_bars
 from investment_mcp_server.tools.stock_quote_metadata import execute_get_stock_quote_metadata
 from investment_mcp_server.stock_client import YahooStockClient
@@ -37,8 +38,8 @@ def create_server(
         name="investment-mcp-server",
         instructions=(
             "Investment MCP server with BIST market data tools backed by Yahoo Finance "
-            "plus direct Canli Doviz gold data and direct TEFAS fund data. BIST tickers are "
-            "normalized to Yahoo's .IS suffix."
+            "plus Yahoo Finance foreign currency data, direct Canli Doviz gold data, and "
+            "direct TEFAS fund data. BIST tickers are normalized to Yahoo's .IS suffix."
         ),
         log_level=resolved_settings.log_level,
         stateless_http=True,
@@ -67,11 +68,19 @@ def create_server(
                 "If true, asks Yahoo to include pre-market and post-market periods when available."
             ),
         ),
+        current_price: bool = Field(
+            default=False,
+            description=(
+                "If true, returns the current/latest price directly instead of the full metadata "
+                "payload."
+            ),
+        ),
     ) -> dict[str, Any]:
         return await execute_get_stock_quote_metadata(
             resolved_stock_client,
             ticker=ticker,
             include_prepost=include_prepost,
+            current_price=current_price,
         )
 
     @mcp.tool(
@@ -79,8 +88,8 @@ def create_server(
         description=(
             "Fetch time-series stock OHLCV candles for a BIST symbol from Yahoo Finance. Supports "
             "preset windows (1w, 1mo, 3mo, 6mo, 1y, 5y) or explicit Istanbul-time start/end, "
-            "strict alignment checks, null-bar filtering, and optional output limiting. Returns "
-            "bars with Unix timestamp and ISO UTC datetime in a standard envelope: {ok, data, error}."
+            "strict alignment checks, null-bar filtering, optional output limiting, and current "
+            "price mode. Returns a standard envelope: {ok, data, error}."
         ),
     )
     async def get_stock_ohlcv_bars(
@@ -141,7 +150,15 @@ def create_server(
         limit: int | None = Field(
             default=None,
             description=(
-                "Optional maximum number of latest bars to include. Must be greater than 0 when set."
+                "Optional maximum number of latest bars to include. Must be greater than 0 "
+                "when set."
+            ),
+        ),
+        current_price: bool = Field(
+            default=False,
+            description=(
+                "If true, returns the current/latest price for the symbol. When true, preset, "
+                "start, and end are ignored and are not required."
             ),
         ),
     ) -> dict[str, Any]:
@@ -156,6 +173,104 @@ def create_server(
             include_null_bars=include_null_bars,
             strict_alignment=strict_alignment,
             limit=limit,
+            current_price=current_price,
+        )
+
+    @mcp.tool(
+        name="get_currency_ohlcv_bars",
+        description=(
+            "Fetch time-series foreign currency OHLCV candles from Yahoo Finance. Supports "
+            "pairs like USD/TRY, USDTRY, EUR/TRY, EURTRY, or direct Yahoo FX symbols like "
+            "TRY=X and EURTRY=X. Supports preset windows (1w, 1mo, 3mo, 6mo, 1y, 5y) or "
+            "explicit Istanbul-time start/end, null-bar filtering, and optional output "
+            "limiting, plus current price mode. Returns a standard envelope: {ok, data, error}."
+        ),
+    )
+    async def get_currency_ohlcv_bars(
+        pair: str = Field(
+            description=(
+                "Target currency pair. Accepts slash form such as USD/TRY, compact form "
+                "such as EURTRY, or Yahoo symbols such as TRY=X and EURTRY=X."
+            )
+        ),
+        start: str | None = Field(
+            default=None,
+            description=(
+                "Optional start datetime in format dd.mm.yyyy hh.MM using Europe/Istanbul "
+                "timezone. Must be supplied with end and cannot be combined with preset. "
+                "Example: 01.01.2024 09.30"
+            )
+        ),
+        end: str | None = Field(
+            default=None,
+            description=(
+                "Optional end datetime in format dd.mm.yyyy hh.MM using Europe/Istanbul "
+                "timezone. Must be supplied with start and cannot be combined with preset. "
+                "Example: 31.01.2024 18.00"
+            )
+        ),
+        preset: str | None = Field(
+            default=None,
+            description=(
+                "Optional preset window. Supported values: 1w, 1mo, 3mo, 6mo, 1y, 5y. "
+                "Cannot be combined with start/end."
+            ),
+        ),
+        interval: str = Field(
+            default="1d",
+            description=(
+                "Requested candle granularity. Supported values include 1m, 5m, 15m, 1h, 1d, "
+                "1wk, and 1mo. Use values Yahoo supports for the requested time span."
+            )
+        ),
+        include_prepost: bool = Field(
+            default=True,
+            description=(
+                "If true, requests pre/post periods from Yahoo. This defaults to true for FX "
+                "to match Yahoo chart requests commonly used for currency pairs."
+            ),
+        ),
+        include_null_bars: bool = Field(
+            default=False,
+            description=(
+                "If false, bars containing any null OHLCV value are dropped and counted in "
+                "dropped_null_bar_count."
+            ),
+        ),
+        strict_alignment: bool = Field(
+            default=True,
+            description=(
+                "If true, returns DATA_ALIGNMENT_ERROR when timestamp/open/high/low/close/volume "
+                "array lengths differ."
+            ),
+        ),
+        limit: int | None = Field(
+            default=None,
+            description=(
+                "Optional maximum number of latest bars to include. Must be greater than 0 "
+                "when set."
+            ),
+        ),
+        current_price: bool = Field(
+            default=False,
+            description=(
+                "If true, returns the current/latest price for the currency pair. When true, "
+                "preset, start, and end are ignored and are not required."
+            ),
+        ),
+    ) -> dict[str, Any]:
+        return await execute_get_currency_ohlcv_bars(
+            resolved_stock_client,
+            pair=pair,
+            start=start,
+            end=end,
+            preset=preset,
+            interval=interval,
+            include_prepost=include_prepost,
+            include_null_bars=include_null_bars,
+            strict_alignment=strict_alignment,
+            limit=limit,
+            current_price=current_price,
         )
 
     @mcp.tool(
@@ -164,8 +279,8 @@ def create_server(
             "Fetch daily gold price data with direct Canli Doviz provider "
             "calls. Supports gram-altin / XAUTRY only and returns opening, closing, and "
             "average prices. Provide either a preset (1w, 1mo, 3mo, 6mo, 1y, 5y) or a "
-            "start_date/end_date range. Returns a standard envelope: "
-            "{ok, data, error}."
+            "start_date/end_date range, or set current_price=true for the latest price. "
+            "Returns a standard envelope: {ok, data, error}."
         ),
     )
     async def get_gold_price_data(
@@ -191,6 +306,13 @@ def create_server(
             default=None,
             description="Optional history end date in YYYY-MM-DD format.",
         ),
+        current_price: bool = Field(
+            default=False,
+            description=(
+                "If true, returns the current/latest gold price. When true, preset, "
+                "start_date, and end_date are ignored and are not required."
+            ),
+        ),
     ) -> dict[str, Any]:
         return await execute_get_gold_price_data(
             resolved_gold_client,
@@ -198,6 +320,7 @@ def create_server(
             preset=preset,
             start_date=start_date,
             end_date=end_date,
+            current_price=current_price,
         )
 
     @mcp.tool(
@@ -205,7 +328,7 @@ def create_server(
         description=(
             "Fetch daily TEFAS mutual fund price data for a fund code over a date range. "
             "Accepts the same preset windows as gold and stocks (1w, 1mo, 3mo, 6mo, 1y, 5y) "
-            "or explicit start_date/end_date. "
+            "or explicit start_date/end_date, or set current_price=true for the latest price. "
             "Returns price points plus opening, closing, average, total return, and "
             "annualized return in the standard envelope: {ok, data, error}."
         ),
@@ -235,6 +358,13 @@ def create_server(
                 "cannot be combined with preset."
             ),
         ),
+        current_price: bool = Field(
+            default=False,
+            description=(
+                "If true, returns the current/latest fund price. When true, preset, "
+                "start_date, and end_date are ignored and are not required."
+            ),
+        ),
     ) -> dict[str, Any]:
         return await execute_get_fund_price_data(
             resolved_fund_client,
@@ -242,6 +372,7 @@ def create_server(
             preset=preset,
             start_date=start_date,
             end_date=end_date,
+            current_price=current_price,
         )
 
     @mcp.resource("config://server")
@@ -252,9 +383,10 @@ def create_server(
             "version": "0.1.0",
             "status": "ready",
             "stock_data_provider": "Yahoo Finance",
+            "currency_data_provider": "Yahoo Finance",
             "gold_data_provider": "Canli Doviz",
             "fund_data_provider": "TEFAS",
-            "market": "BIST, gold, funds",
+            "market": "BIST, foreign currencies, gold, funds",
         }
 
     @mcp.prompt()

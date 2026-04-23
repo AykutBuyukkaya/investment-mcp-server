@@ -134,6 +134,25 @@ def _fund_price_summary(
     )
 
 
+def _latest_fund_price(
+    *,
+    fund_code: str,
+    points: list[FundPricePoint],
+) -> dict[str, Any]:
+    if not points:
+        raise InputError("No fund price points are available")
+
+    latest = points[-1]
+    return {
+        "fund_code": fund_code,
+        "fund_name": latest.fund_name,
+        "source": "tefas",
+        "current_price": latest.price,
+        "currency": "TRY",
+        "date": latest.date,
+    }
+
+
 async def execute_get_fund_price_data(
     fund_client: FundPriceClient,
     *,
@@ -141,10 +160,23 @@ async def execute_get_fund_price_data(
     preset: str | None = None,
     start_date: str | None = None,
     end_date: str | None = None,
+    current_price: bool = False,
 ) -> dict[str, Any]:
     """Fetch daily TEFAS fund price data in a standard envelope."""
     try:
         normalized_fund_code = normalize_fund_code(fund_code)
+        if current_price:
+            end_dt = datetime.now(MARKET_TIMEZONE)
+            start_dt = end_dt - timedelta(days=14)
+            points = await fund_client.get_price_history(
+                normalized_fund_code,
+                start_date=start_dt.strftime(DATE_FORMAT),
+                end_date=end_dt.strftime(DATE_FORMAT),
+            )
+            return _make_success_response(
+                _latest_fund_price(fund_code=normalized_fund_code, points=points)
+            )
+
         normalized_preset = _validate_preset(preset)
         normalized_start_date = _validate_date(start_date, field_name="start_date")
         normalized_end_date = _validate_date(end_date, field_name="end_date")

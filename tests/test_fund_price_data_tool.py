@@ -80,6 +80,32 @@ def test_execute_get_fund_price_data_preset_success() -> None:
     assert client.calls[0]["fund_code"] == "AFT"
 
 
+def test_execute_get_fund_price_data_current_price_ignores_range_inputs() -> None:
+    client = FakeFundClient()
+
+    result = asyncio.run(
+        execute_get_fund_price_data(
+            client,
+            fund_code="aft",
+            preset="not-used",
+            start_date="2026-04-22",
+            end_date="2026-04-20",
+            current_price=True,
+        )
+    )
+
+    assert result["ok"] is True
+    assert result["data"]["fund_code"] == "AFT"
+    assert result["data"]["fund_name"] == "AFT Fund"
+    assert result["data"]["source"] == "tefas"
+    assert result["data"]["current_price"] == 0.99
+    assert result["data"]["currency"] == "TRY"
+    assert result["data"]["date"] == "2026-04-22"
+    assert client.calls[0]["fund_code"] == "AFT"
+    assert client.calls[0]["start_date"] != "2026-04-22"
+    assert client.calls[0]["end_date"] != "2026-04-20"
+
+
 def test_execute_get_fund_price_data_rejects_bad_code() -> None:
     client = FakeFundClient()
 

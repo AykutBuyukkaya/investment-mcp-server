@@ -1,4 +1,4 @@
-"""Stock OHLCV bars MCP tool implementation."""
+"""Foreign currency OHLCV bars MCP tool implementation."""
 
 from __future__ import annotations
 
@@ -14,8 +14,12 @@ from investment_mcp_server.errors import (
     TickerNotFoundError,
     map_exception_to_error_payload,
 )
-from investment_mcp_server.parsers import normalize_interval, normalize_ticker, parse_ohlcv_bars
-from investment_mcp_server.parsers import parse_quote_meta
+from investment_mcp_server.parsers import (
+    normalize_currency_pair,
+    normalize_interval,
+    parse_ohlcv_bars,
+    parse_quote_meta,
+)
 
 
 DATE_INPUT_FORMAT = "%d.%m.%Y %H.%M"
@@ -34,7 +38,7 @@ PRESET_DAYS: dict[Preset, int] = {
 }
 
 
-class StockChartClient(Protocol):
+class CurrencyChartClient(Protocol):
     async def fetch_chart(
         self,
         ticker: str,
@@ -155,14 +159,16 @@ def _latest_close_from_raw(raw: dict[str, Any]) -> tuple[float | None, int | Non
 
 
 async def _fetch_current_price(
-    stock_client: StockChartClient,
+    currency_client: CurrencyChartClient,
     *,
-    normalized_ticker: str,
+    base_currency: str,
+    quote_currency: str,
+    yahoo_symbol: str,
     include_prepost: bool,
 ) -> dict[str, Any]:
     now_ts = int(time.time())
-    raw = await stock_client.fetch_chart(
-        ticker=normalized_ticker,
+    raw = await currency_client.fetch_chart(
+        ticker=yahoo_symbol,
         period1=now_ts - 5 * 24 * 60 * 60,
         period2=now_ts,
         interval="1m",
@@ -178,40 +184,45 @@ async def _fetch_current_price(
         else fallback_price
     )
     if price is None:
-        raise NoDataError(f"No current price returned for {normalized_ticker}")
+        raise NoDataError(f"No current price returned for {yahoo_symbol}")
 
     return {
-        "normalized_ticker": normalized_ticker,
+        "pair": f"{base_currency}/{quote_currency}",
+        "base_currency": base_currency,
+        "quote_currency": quote_currency,
+        "yahoo_symbol": yahoo_symbol,
         "source": "yahoo_finance",
         "current_price": price,
-        "currency": quote_meta.currency,
+        "currency": quote_meta.currency or quote_currency,
         "timestamp": fallback_timestamp,
         "timezone": quote_meta.timezone,
         "meta": quote_meta.to_dict(),
     }
 
 
-async def execute_get_stock_ohlcv_bars(
-    stock_client: StockChartClient,
+async def execute_get_currency_ohlcv_bars(
+    currency_client: CurrencyChartClient,
     *,
-    ticker: str,
+    pair: str,
     start: str | None = None,
     end: str | None = None,
     preset: str | None = None,
     interval: str = "1d",
-    include_prepost: bool = False,
+    include_prepost: bool = True,
     include_null_bars: bool = False,
     strict_alignment: bool = True,
     limit: int | None = None,
     current_price: bool = False,
 ) -> dict[str, Any]:
-    """Fetch and return parsed OHLCV bars in a standard envelope."""
+    """Fetch and return parsed currency OHLCV bars in a standard envelope."""
     try:
-        normalized_ticker = normalize_ticker(ticker)
+        base_currency, quote_currency, yahoo_symbol = normalize_currency_pair(pair)
         if current_price:
             data = await _fetch_current_price(
-                stock_client,
-                normalized_ticker=normalized_ticker,
+                currency_client,
+                base_currency=base_currency,
+                quote_currency=quote_currency,
+                yahoo_symbol=yahoo_symbol,
                 include_prepost=include_prepost,
             )
             return _make_success_response(data)
@@ -230,8 +241,8 @@ async def execute_get_stock_ohlcv_bars(
             limit=limit,
         )
 
-        raw = await stock_client.fetch_chart(
-            ticker=normalized_ticker,
+        raw = await currency_client.fetch_chart(
+            ticker=yahoo_symbol,
             period1=start_ts,
             period2=end_ts,
             interval=normalized_interval,
@@ -251,12 +262,16 @@ async def execute_get_stock_ohlcv_bars(
         quote_meta = parse_quote_meta(raw)
         return _make_success_response(
             {
-                "normalized_ticker": normalized_ticker,
+                "pair": f"{base_currency}/{quote_currency}",
+                "base_currency": base_currency,
+                "quote_currency": quote_currency,
+                "yahoo_symbol": yahoo_symbol,
                 "interval": normalized_interval,
                 "preset": normalized_preset,
                 "start": resolved_start,
                 "end": resolved_end,
                 "timezone": quote_meta.timezone,
+                "meta": quote_meta.to_dict(),
                 "bars": [bar.to_dict() for bar in bars],
                 "dropped_null_bar_count": dropped_null_bar_count,
             }
