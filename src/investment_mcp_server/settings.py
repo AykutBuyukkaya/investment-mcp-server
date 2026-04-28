@@ -74,6 +74,23 @@ class Settings(BaseSettings):
             "yf_default_include_prepost",
         ),
     )
+    portfolio_backend_base_url: str = Field(
+        default="http://localhost:8080",
+        validation_alias=AliasChoices(
+            "PORTFOLIO_BACKEND_BASE_URL",
+            "MCP_PORTFOLIO_BACKEND_BASE_URL",
+            "portfolio_backend_base_url",
+        ),
+    )
+    portfolio_backend_timeout_seconds: float = Field(
+        default=10.0,
+        gt=0,
+        validation_alias=AliasChoices(
+            "PORTFOLIO_BACKEND_TIMEOUT_SECONDS",
+            "MCP_PORTFOLIO_BACKEND_TIMEOUT_SECONDS",
+            "portfolio_backend_timeout_seconds",
+        ),
+    )
 
     @field_validator("log_level")
     @classmethod
@@ -91,6 +108,14 @@ class Settings(BaseSettings):
         normalized = value.rstrip("/")
         if not (normalized.startswith("https://") or normalized.startswith("http://")):
             raise ValueError("yf_base_url must start with http:// or https://")
+        return normalized
+
+    @field_validator("portfolio_backend_base_url")
+    @classmethod
+    def validate_portfolio_backend_base_url(cls, value: str) -> str:
+        normalized = value.rstrip("/")
+        if not (normalized.startswith("https://") or normalized.startswith("http://")):
+            raise ValueError("portfolio_backend_base_url must start with http:// or https://")
         return normalized
 
     @field_validator("yf_user_agent")

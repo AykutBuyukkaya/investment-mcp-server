@@ -8,6 +8,9 @@ from pydantic import Field
 from investment_mcp_server.settings import Settings
 from investment_mcp_server.fund_client import DirectFundClient
 from investment_mcp_server.gold_client import DirectGoldClient
+from investment_mcp_server.portfolio_client import BackendPortfolioClient
+from investment_mcp_server.tools.customer_portfolio import PortfolioClient
+from investment_mcp_server.tools.customer_portfolio import execute_get_customer_portfolio
 from investment_mcp_server.tools.fund_price_data import FundPriceClient
 from investment_mcp_server.tools.fund_price_data import execute_get_fund_price_data
 from investment_mcp_server.tools.gold_price_data import execute_get_gold_price_data
@@ -26,6 +29,7 @@ def create_server(
     stock_client: YahooStockClient | None = None,
     gold_client: GoldPriceClient | None = None,
     fund_client: FundPriceClient | None = None,
+    portfolio_client: PortfolioClient | None = None,
     settings: Settings | None = None,
 ) -> FastMCP:
     """Create the MCP server and register all tools/resources/prompts."""
@@ -33,13 +37,15 @@ def create_server(
     resolved_stock_client = stock_client or YahooStockClient(settings=resolved_settings)
     resolved_gold_client = gold_client or DirectGoldClient()
     resolved_fund_client = fund_client or DirectFundClient()
+    resolved_portfolio_client = portfolio_client or BackendPortfolioClient(settings=resolved_settings)
 
     mcp = FastMCP(
         name="investment-mcp-server",
         instructions=(
             "Investment MCP server with BIST market data tools backed by Yahoo Finance "
             "plus Yahoo Finance foreign currency data, direct Canli Doviz gold data, and "
-            "direct TEFAS fund data. BIST tickers are normalized to Yahoo's .IS suffix."
+            "direct TEFAS fund data, plus a local customer portfolio backend integration. "
+            "BIST tickers are normalized to Yahoo's .IS suffix."
         ),
         log_level=resolved_settings.log_level,
         stateless_http=True,
@@ -375,6 +381,18 @@ def create_server(
             current_price=current_price,
         )
 
+    @mcp.tool(
+        name="get_customer_portfolio",
+        description=(
+            "Fetch the customer's current dummy portfolio from the local backend service at "
+            "/api/portfolio. The backend is expected to run on the same machine or Docker "
+            "network. Returns the backend portfolio payload in the standard envelope: "
+            "{ok, data, error}."
+        ),
+    )
+    async def get_customer_portfolio() -> dict[str, Any]:
+        return await execute_get_customer_portfolio(resolved_portfolio_client)
+
     @mcp.resource("config://server")
     def server_config() -> dict[str, str]:
         """Expose minimal server metadata."""
@@ -386,7 +404,8 @@ def create_server(
             "currency_data_provider": "Yahoo Finance",
             "gold_data_provider": "Canli Doviz",
             "fund_data_provider": "TEFAS",
-            "market": "BIST, foreign currencies, gold, funds",
+            "portfolio_data_provider": "Local portfolio backend",
+            "market": "BIST, foreign currencies, gold, funds, customer portfolio",
         }
 
     @mcp.prompt()
@@ -444,10 +463,12 @@ def main() -> None:
     stock_client = YahooStockClient(settings=settings)
     gold_client = DirectGoldClient()
     fund_client = DirectFundClient()
+    portfolio_client = BackendPortfolioClient(settings=settings)
     server = create_server(
         stock_client=stock_client,
         gold_client=gold_client,
         fund_client=fund_client,
+        portfolio_client=portfolio_client,
         settings=settings,
     )
 
@@ -458,6 +479,7 @@ def main() -> None:
         _close_stock_client_sync(stock_client)
         _close_gold_client_sync(gold_client)
         _close_gold_client_sync(fund_client)
+        _close_gold_client_sync(portfolio_client)
         LOGGER.info("Stock HTTP client closed")
 
 
