@@ -10,12 +10,22 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     transport: Literal["stdio", "sse", "streamable-http"] = Field(
-        default="stdio",
+        default="streamable-http",
         validation_alias=AliasChoices("MCP_TRANSPORT", "transport"),
     )
     log_level: str = Field(
         default="INFO",
         validation_alias=AliasChoices("MCP_LOG_LEVEL", "INVESTMENT_MCP_LOG_LEVEL", "log_level"),
+    )
+    host: str = Field(
+        default="127.0.0.1",
+        validation_alias=AliasChoices("MCP_HOST", "host"),
+    )
+    port: int = Field(
+        default=8000,
+        ge=1,
+        le=65535,
+        validation_alias=AliasChoices("MCP_PORT", "port"),
     )
     yf_base_url: str = Field(
         default="https://query2.finance.yahoo.com",
