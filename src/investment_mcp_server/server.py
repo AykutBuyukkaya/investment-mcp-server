@@ -18,6 +18,7 @@ from investment_mcp_server.tools.gold_price_data import GoldPriceClient
 from investment_mcp_server.tools.currency_ohlcv_bars import execute_get_currency_ohlcv_bars
 from investment_mcp_server.tools.stock_ohlcv_bars import execute_get_stock_ohlcv_bars
 from investment_mcp_server.tools.stock_quote_metadata import execute_get_stock_quote_metadata
+from investment_mcp_server.tools.turkey_inflation import execute_get_turkey_inflation
 from investment_mcp_server.stock_client import YahooStockClient
 
 Transport = Literal["stdio", "sse", "streamable-http"]
@@ -44,8 +45,13 @@ def create_server(
         instructions=(
             "Investment MCP server with BIST market data tools backed by Yahoo Finance "
             "plus Yahoo Finance foreign currency data, direct Canli Doviz gold data, and "
-            "direct TEFAS fund data, plus a local customer portfolio backend integration. "
-            "BIST tickers are normalized to Yahoo's .IS suffix."
+            "direct TEFAS fund data, static Turkey CPI inflation data, plus a local "
+            "customer portfolio backend integration. "
+            "BIST tickers are normalized to Yahoo's .IS suffix. "
+            "When presenting customer portfolio data to a user, render portfolio holdings "
+            "and asset-class distributions as semantic HTML tables using table, thead, "
+            "tbody, tr, th, and td elements. Do not render portfolio tables as Markdown. "
+            "Right-align numeric cells and keep Turkish currency/percentage formatting."
         ),
         log_level=resolved_settings.log_level,
         host=resolved_settings.host,
@@ -384,12 +390,63 @@ def create_server(
         )
 
     @mcp.tool(
+        name="get_turkey_inflation",
+        description=(
+            "Return Turkey CPI inflation data from the supplied static dataset "
+            "(Fiyat Endeksi / Tuketici Fiyatlari, 2025=100). Returns annual and monthly "
+            "percentage changes. With no period arguments, returns the latest available "
+            "period. Use period for a single month or start_period/end_period for an "
+            "inclusive range. Accepted period formats: MM-YYYY or YYYY-MM. Returns a "
+            "standard envelope: {ok, data, error}."
+        ),
+    )
+    async def get_turkey_inflation(
+        period: str | None = Field(
+            default=None,
+            description=(
+                "Optional single inflation period in MM-YYYY or YYYY-MM format. "
+                "Example: 04-2026 or 2026-04. Cannot be combined with start_period/end_period."
+            ),
+        ),
+        start_period: str | None = Field(
+            default=None,
+            description=(
+                "Optional inclusive range start period in MM-YYYY or YYYY-MM format. "
+                "Must be supplied with end_period and cannot be combined with period."
+            ),
+        ),
+        end_period: str | None = Field(
+            default=None,
+            description=(
+                "Optional inclusive range end period in MM-YYYY or YYYY-MM format. "
+                "Must be supplied with start_period and cannot be combined with period."
+            ),
+        ),
+        limit: int | None = Field(
+            default=None,
+            description=(
+                "Optional maximum number of latest records to include. When used with a "
+                "range, limits to the latest records within that range. Must be greater "
+                "than 0 when set."
+            ),
+        ),
+    ) -> dict[str, Any]:
+        return await execute_get_turkey_inflation(
+            period=period,
+            start_period=start_period,
+            end_period=end_period,
+            limit=limit,
+        )
+
+    @mcp.tool(
         name="get_customer_portfolio",
         description=(
             "Fetch the customer's current dummy portfolio from the local backend service at "
             "/api/portfolio. The backend is expected to run on the same machine or Docker "
             "network. Returns the backend portfolio payload in the standard envelope: "
-            "{ok, data, error}."
+            "{ok, data, error}. When using this data in an assistant response, present "
+            "portfolio holdings and asset-class summaries as semantic HTML tables, not "
+            "Markdown tables, with numeric columns right-aligned."
         ),
     )
     async def get_customer_portfolio() -> dict[str, Any]:
@@ -406,8 +463,9 @@ def create_server(
             "currency_data_provider": "Yahoo Finance",
             "gold_data_provider": "Canli Doviz",
             "fund_data_provider": "TEFAS",
+            "turkey_inflation_data_provider": "Provided static CPI dataset",
             "portfolio_data_provider": "Local portfolio backend",
-            "market": "BIST, foreign currencies, gold, funds, customer portfolio",
+            "market": "BIST, foreign currencies, gold, funds, Turkey inflation, customer portfolio",
         }
 
     @mcp.prompt()
