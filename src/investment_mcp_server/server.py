@@ -48,6 +48,8 @@ def create_server(
             "BIST tickers are normalized to Yahoo's .IS suffix."
         ),
         log_level=resolved_settings.log_level,
+        host=resolved_settings.host,
+        port=resolved_settings.port,
         stateless_http=True,
         json_response=True,
     )

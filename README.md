@@ -43,22 +43,28 @@ pip install -e ".[dev]"
 
 ## Run
 
-The default transport is `stdio`, which is the usual mode for local MCP clients:
+The default transport is streamable HTTP:
 
 ```bash
 uv run investment-mcp-server
 ```
 
-For browser-accessible or service-style development, use streamable HTTP:
-
-```bash
-MCP_TRANSPORT=streamable-http uv run investment-mcp-server
-```
-
-The streamable HTTP endpoint is available at the SDK default path, typically:
+The streamable HTTP endpoint is available at:
 
 ```text
 http://localhost:8000/mcp
+```
+
+For Docker or another host/port, configure:
+
+```bash
+MCP_HOST=0.0.0.0 MCP_PORT=8000 uv run investment-mcp-server
+```
+
+If a local MCP client needs stdio, override the transport explicitly:
+
+```bash
+MCP_TRANSPORT=stdio uv run investment-mcp-server
 ```
 
 ## Tools
