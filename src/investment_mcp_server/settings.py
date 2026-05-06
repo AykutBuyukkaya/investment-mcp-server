@@ -85,7 +85,7 @@ class Settings(BaseSettings):
         ),
     )
     portfolio_backend_base_url: str = Field(
-        default="http://localhost:8080",
+        default="http://localhost:6767",
         validation_alias=AliasChoices(
             "PORTFOLIO_BACKEND_BASE_URL",
             "MCP_PORTFOLIO_BACKEND_BASE_URL",

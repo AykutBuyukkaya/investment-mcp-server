@@ -77,7 +77,7 @@ The server currently registers these MCP tools:
 - `get_gold_price_data`: fetches daily gram gold / XAUTRY data directly from Canli Doviz and returns opening, closing, and average prices. Use either `preset` (`1w`, `1mo`, `3mo`, `6mo`, `1y`, `5y`) or `start_date` plus `end_date`. Set `current_price=true` to fetch only the latest price; in that mode `preset`, `start_date`, and `end_date` are not required and are ignored when supplied.
 - `get_fund_price_data`: fetches daily TEFAS fund prices for a fund code using either `preset` (`1w`, `1mo`, `3mo`, `6mo`, `1y`, `5y`) or `start_date` plus `end_date`, and returns opening, closing, average, total return, and annualized return. Set `current_price=true` to fetch only the latest price; in that mode `preset`, `start_date`, and `end_date` are not required and are ignored when supplied.
 - `get_turkey_inflation`: returns Turkey CPI inflation data from the supplied static dataset (`Fiyat Endeksi / Tuketici Fiyatlari`, 2025=100), including annual and monthly percentage changes. With no arguments it returns the latest available period. Use `period` for one month or `start_period` plus `end_period` for an inclusive range; period formats can be `MM-YYYY` or `YYYY-MM`.
-- `get_customer_portfolio`: fetches the customer's current dummy portfolio from the local backend service at `/api/portfolio`. Configure the backend origin with `PORTFOLIO_BACKEND_BASE_URL`, defaulting to `http://localhost:8080`.
+- `get_customer_portfolio`: fetches the customer's current dummy portfolio from the local backend service at `/api/portfolio`. Configure the backend origin with `PORTFOLIO_BACKEND_BASE_URL`, defaulting to `http://localhost:6767`.
 
 Tool responses use this envelope:
 

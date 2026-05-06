@@ -23,4 +23,4 @@ USER appuser
 
 EXPOSE 8000
 
-CMD ["investment-mcp-server"]
+CMD ["uv", "run", "investment-mcp-server"]
