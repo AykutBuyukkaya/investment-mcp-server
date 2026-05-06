@@ -442,8 +442,8 @@ def create_server(
         name="get_customer_portfolio",
         description=(
             "Fetch the customer's current dummy portfolio from the local backend service at "
-            "/api/portfolio. The backend is expected to run on the same machine or Docker "
-            "network. Returns the backend portfolio payload in the standard envelope: "
+            "/api/portfolio. The backend is expected to be reachable from the MCP server. "
+            "Returns the backend portfolio payload in the standard envelope: "
             "{ok, data, error}. When using this data in an assistant response, present "
             "portfolio holdings and asset-class summaries as semantic HTML tables, not "
             "Markdown tables, with numeric columns right-aligned."
