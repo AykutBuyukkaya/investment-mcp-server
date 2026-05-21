@@ -19,6 +19,8 @@ from investment_mcp_server.tools.currency_ohlcv_bars import execute_get_currency
 from investment_mcp_server.tools.stock_ohlcv_bars import execute_get_stock_ohlcv_bars
 from investment_mcp_server.tools.stock_quote_metadata import execute_get_stock_quote_metadata
 from investment_mcp_server.tools.turkey_inflation import execute_get_turkey_inflation
+from investment_mcp_server.tools.compare_asset_returns import execute_compare_asset_returns
+from investment_mcp_server.tools.real_returns import execute_get_real_returns
 from investment_mcp_server.stock_client import YahooStockClient
 
 Transport = Literal["stdio", "sse", "streamable-http"]
@@ -439,6 +441,123 @@ def create_server(
         )
 
     @mcp.tool(
+        name="compare_asset_returns",
+        description=(
+            "Compare nominal returns across multiple assets (BIST stocks, currency pairs, gold, "
+            "TEFAS funds) over a shared time period. Accepts up to 10 assets as a list of "
+            "{'type': ..., 'identifier': ...} specs where type is one of: stock, currency, gold, "
+            "fund. Uses either a preset window (1w, 1mo, 3mo, 6mo, 1y, 5y) or an explicit "
+            "start_date/end_date range in YYYY-MM-DD format. Per-asset failures are returned "
+            "inline without failing the whole call. Results are returned both in input order and "
+            "ranked by total_return_percent descending. Returns a standard envelope: "
+            "{ok, data, error}."
+        ),
+    )
+    async def compare_asset_returns(
+        assets: list[dict[str, str]] = Field(
+            description=(
+                "List of asset specs to compare. Each spec must have 'type' (stock, currency, "
+                "gold, or fund) and 'identifier' (BIST ticker like THYAO, currency pair like "
+                "USD/TRY, gold asset like gram-altin, or TEFAS fund code like AFT). "
+                "Example: [{\"type\": \"stock\", \"identifier\": \"THYAO\"}, "
+                "{\"type\": \"fund\", \"identifier\": \"AFT\"}]"
+            )
+        ),
+        preset: str | None = Field(
+            default=None,
+            description=(
+                "Optional preset window. Supported values: 1w, 1mo, 3mo, 6mo, 1y, 5y. "
+                "Cannot be combined with start_date/end_date."
+            ),
+        ),
+        start_date: str | None = Field(
+            default=None,
+            description=(
+                "Optional start date in YYYY-MM-DD format. Must be supplied with end_date and "
+                "cannot be combined with preset."
+            ),
+        ),
+        end_date: str | None = Field(
+            default=None,
+            description=(
+                "Optional end date in YYYY-MM-DD format. Must be supplied with start_date and "
+                "cannot be combined with preset."
+            ),
+        ),
+    ) -> dict[str, Any]:
+        return await execute_compare_asset_returns(
+            resolved_stock_client,
+            resolved_gold_client,
+            resolved_fund_client,
+            assets=assets,
+            preset=preset,
+            start_date=start_date,
+            end_date=end_date,
+        )
+
+    @mcp.tool(
+        name="get_real_returns",
+        description=(
+            "Compute inflation-adjusted (real) return for a single asset over a time period. "
+            "Fetches the asset's price history and compounds Turkey CPI monthly changes for the "
+            "same period, then applies the Fisher equation: "
+            "real_return = (1 + nominal) / (1 + cumulative_inflation) - 1. "
+            "Supported asset types: stock (BIST via Yahoo Finance), currency (FX via Yahoo "
+            "Finance), gold (gram-altin via Canli Doviz), fund (TEFAS). "
+            "Use preset (1w, 1mo, 3mo, 6mo, 1y, 5y) or explicit start_date/end_date. "
+            "Returns nominal_return_percent, cumulative_inflation_percent, real_return_percent, "
+            "annualized variants, beat_inflation flag, and the CPI records used. "
+            "Returns a standard envelope: {ok, data, error}."
+        ),
+    )
+    async def get_real_returns(
+        asset_type: str = Field(
+            description=(
+                "Type of asset. One of: stock, currency, gold, fund."
+            )
+        ),
+        identifier: str = Field(
+            description=(
+                "Asset identifier. For stock: BIST ticker like THYAO or THYAO.IS. "
+                "For currency: pair like USD/TRY, USDTRY, or Yahoo symbol like TRY=X. "
+                "For gold: gram-altin (or aliases: gram, XAUTRY). "
+                "For fund: TEFAS fund code like AFT or NNF."
+            )
+        ),
+        preset: str | None = Field(
+            default=None,
+            description=(
+                "Optional preset window. Supported values: 1w, 1mo, 3mo, 6mo, 1y, 5y. "
+                "Cannot be combined with start_date/end_date."
+            ),
+        ),
+        start_date: str | None = Field(
+            default=None,
+            description=(
+                "Optional start date in YYYY-MM-DD format. Must be supplied with end_date and "
+                "cannot be combined with preset."
+            ),
+        ),
+        end_date: str | None = Field(
+            default=None,
+            description=(
+                "Optional end date in YYYY-MM-DD format. Must be supplied with start_date and "
+                "cannot be combined with preset."
+            ),
+        ),
+    ) -> dict[str, Any]:
+        return await execute_get_real_returns(
+            resolved_stock_client,
+            resolved_gold_client,
+            resolved_fund_client,
+            asset_type=asset_type,
+            identifier=identifier,
+            preset=preset,
+            start_date=start_date,
+            end_date=end_date,
+        )
+
+    @mcp.tool(
         name="get_customer_portfolio",
         description=(
             "Fetch the customer's current dummy portfolio from the local backend service at "
@@ -465,7 +584,7 @@ def create_server(
             "fund_data_provider": "TEFAS",
             "turkey_inflation_data_provider": "Provided static CPI dataset",
             "portfolio_data_provider": "Local portfolio backend",
-            "market": "BIST, foreign currencies, gold, funds, Turkey inflation, customer portfolio",
+            "market": "BIST, foreign currencies, gold, funds, Turkey inflation, customer portfolio, multi-asset comparison, real returns",
         }
 
     @mcp.prompt()
