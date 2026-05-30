@@ -35,56 +35,16 @@ A Python [Model Context Protocol](https://modelcontextprotocol.io) server exposi
 
 The server is publicly hosted — no local installation required.
 
-### Step 1 — Locate the Claude Desktop config file
+1. Open Claude Desktop and go to **Settings → Connectors**
+2. Click **Add connector** and paste the MCP endpoint URL:
+   ```
+   https://inv.aykutbuyukkaya.com/mcp
+   ```
+3. Save and restart Claude Desktop. The investment tools will appear in the tool list.
 
-| Platform | Path |
-|---|---|
-| macOS | `~/Library/Application Support/Claude/claude_desktop_config.json` |
-| Windows | `%APPDATA%\Claude\claude_desktop_config.json` |
-
-### Step 2 — Add the server entry
-
-Open `claude_desktop_config.json` (create it if it does not exist) and add the following entry under `mcpServers`:
-
-```json
-{
-  "mcpServers": {
-    "investment-mcp-server": {
-      "type": "streamable-http",
-      "url": "https://inv.aykutbuyukkaya.com/mcp"
-    }
-  }
-}
-```
-
-### Step 3 — Restart Claude Desktop
-
-Quit and reopen Claude Desktop. The investment tools will appear in the tool list. You can verify by asking:
+You can verify by asking:
 
 > "What investment tools do you have available?"
-
-### Self-hosting
-
-If you prefer to run the server locally, install the package with `uv sync` and point Claude Desktop to your own instance:
-
-```json
-{
-  "mcpServers": {
-    "investment-mcp-server": {
-      "command": "uv",
-      "args": [
-        "--directory",
-        "/absolute/path/to/investment-mcp-server",
-        "run",
-        "investment-mcp-server"
-      ],
-      "env": {
-        "MCP_TRANSPORT": "stdio"
-      }
-    }
-  }
-}
-```
 
 ---
 
