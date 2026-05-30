@@ -15,6 +15,7 @@ from investment_mcp_server.errors import (
     UpstreamUnavailableError,
 )
 from investment_mcp_server.models import GoldHistoricalBar
+from investment_mcp_server.rate_limiter import RateLimiter
 
 
 @dataclass(frozen=True, slots=True)
@@ -95,8 +96,13 @@ class DirectGoldClient:
         "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     )
 
-    def __init__(self, async_client: httpx.AsyncClient | None = None) -> None:
+    def __init__(
+        self,
+        async_client: httpx.AsyncClient | None = None,
+        rate_limiter: RateLimiter | None = None,
+    ) -> None:
         self._client = async_client
+        self._rate_limiter = rate_limiter or RateLimiter.from_rps(2.0)
 
     async def close(self) -> None:
         return None
@@ -181,6 +187,7 @@ class DirectGoldClient:
         params: dict[str, Any],
     ) -> httpx.Response:
         try:
+            await self._rate_limiter.acquire()
             return await client.get("/items/history", params=params)
         except httpx.RequestError as exc:
             raise UpstreamUnavailableError(

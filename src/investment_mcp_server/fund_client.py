@@ -15,6 +15,7 @@ from investment_mcp_server.errors import (
     UpstreamUnavailableError,
 )
 from investment_mcp_server.models import FundPricePoint
+from investment_mcp_server.rate_limiter import RateLimiter
 
 
 FUND_CODE_PATTERN = re.compile(r"^[A-Z0-9]{2,12}$")
@@ -80,8 +81,13 @@ class DirectFundClient:
         "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36"
     )
 
-    def __init__(self, async_client: httpx.AsyncClient | None = None) -> None:
+    def __init__(
+        self,
+        async_client: httpx.AsyncClient | None = None,
+        rate_limiter: RateLimiter | None = None,
+    ) -> None:
         self._client = async_client
+        self._rate_limiter = rate_limiter or RateLimiter.from_rps(2.0)
 
     async def close(self) -> None:
         return None
@@ -177,6 +183,7 @@ class DirectFundClient:
         data: dict[str, str | int],
     ) -> httpx.Response:
         try:
+            await self._rate_limiter.acquire()
             return await client.post("/api/funds/fonFiyatBilgiGetir", json=data)
         except httpx.RequestError as exc:
             raise UpstreamUnavailableError(

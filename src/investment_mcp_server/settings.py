@@ -102,6 +102,34 @@ class Settings(BaseSettings):
         ),
     )
 
+    # --- Rate limiting (requests per second per upstream provider) ---
+    yf_rate_limit_rps: float = Field(
+        default=5.0,
+        gt=0,
+        validation_alias=AliasChoices("YF_RATE_LIMIT_RPS", "MCP_YF_RATE_LIMIT_RPS"),
+        description="Yahoo Finance requests per second (stocks + currencies share this limiter).",
+    )
+    gold_rate_limit_rps: float = Field(
+        default=2.0,
+        gt=0,
+        validation_alias=AliasChoices("GOLD_RATE_LIMIT_RPS", "MCP_GOLD_RATE_LIMIT_RPS"),
+        description="Canli Doviz gold price requests per second.",
+    )
+    fund_rate_limit_rps: float = Field(
+        default=2.0,
+        gt=0,
+        validation_alias=AliasChoices("FUND_RATE_LIMIT_RPS", "MCP_FUND_RATE_LIMIT_RPS"),
+        description="TEFAS fund price requests per second.",
+    )
+    portfolio_rate_limit_rps: float = Field(
+        default=10.0,
+        gt=0,
+        validation_alias=AliasChoices(
+            "PORTFOLIO_RATE_LIMIT_RPS", "MCP_PORTFOLIO_RATE_LIMIT_RPS"
+        ),
+        description="Portfolio backend requests per second.",
+    )
+
     @field_validator("log_level")
     @classmethod
     def validate_log_level(cls, value: str) -> str:

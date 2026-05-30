@@ -8,6 +8,7 @@ from pydantic import Field
 from investment_mcp_server.settings import Settings
 from investment_mcp_server.fund_client import DirectFundClient
 from investment_mcp_server.gold_client import DirectGoldClient
+from investment_mcp_server.rate_limiter import RateLimiter
 from investment_mcp_server.portfolio_client import BackendPortfolioClient
 from investment_mcp_server.tools.customer_portfolio import PortfolioClient
 from investment_mcp_server.tools.customer_portfolio import execute_get_customer_portfolio
@@ -38,8 +39,12 @@ def create_server(
     """Create the MCP server and register all tools/resources/prompts."""
     resolved_settings = settings or Settings()
     resolved_stock_client = stock_client or YahooStockClient(settings=resolved_settings)
-    resolved_gold_client = gold_client or DirectGoldClient()
-    resolved_fund_client = fund_client or DirectFundClient()
+    resolved_gold_client = gold_client or DirectGoldClient(
+        rate_limiter=RateLimiter.from_rps(resolved_settings.gold_rate_limit_rps)
+    )
+    resolved_fund_client = fund_client or DirectFundClient(
+        rate_limiter=RateLimiter.from_rps(resolved_settings.fund_rate_limit_rps)
+    )
     resolved_portfolio_client = portfolio_client or BackendPortfolioClient(settings=resolved_settings)
 
     mcp = FastMCP(
@@ -640,8 +645,12 @@ def main() -> None:
     configure_logging(settings.log_level)
 
     stock_client = YahooStockClient(settings=settings)
-    gold_client = DirectGoldClient()
-    fund_client = DirectFundClient()
+    gold_client = DirectGoldClient(
+        rate_limiter=RateLimiter.from_rps(settings.gold_rate_limit_rps)
+    )
+    fund_client = DirectFundClient(
+        rate_limiter=RateLimiter.from_rps(settings.fund_rate_limit_rps)
+    )
     portfolio_client = BackendPortfolioClient(settings=settings)
     server = create_server(
         stock_client=stock_client,

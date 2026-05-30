@@ -1,4 +1,4 @@
-"""Async stock data provider client with retry and timeout handling."""
+"""Async stock data provider client with retry, timeout, and rate-limit handling."""
 
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ from typing import Any
 import httpx
 
 from investment_mcp_server.errors import UpstreamHTTPStatusError
+from investment_mcp_server.rate_limiter import RateLimiter
 from investment_mcp_server.settings import Settings
 
 
@@ -22,10 +23,14 @@ class YahooStockClient:
         self,
         settings: Settings | None = None,
         async_client: httpx.AsyncClient | None = None,
+        rate_limiter: RateLimiter | None = None,
     ) -> None:
         self._settings = settings or Settings()
         self._owned_client = async_client is None
         self._client = async_client
+        self._rate_limiter = rate_limiter or RateLimiter.from_rps(
+            self._settings.yf_rate_limit_rps
+        )
 
     async def __aenter__(self) -> "YahooStockClient":
         await self.start()
@@ -83,6 +88,7 @@ class YahooStockClient:
 
         for attempt in range(1, attempts + 1):
             try:
+                await self._rate_limiter.acquire()
                 response = await self._client.get(path, params=params)
                 if response.status_code >= 400:
                     if response.status_code in RETRYABLE_STATUS_CODES and attempt < attempts:

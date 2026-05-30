@@ -11,6 +11,7 @@ from investment_mcp_server.errors import (
     UpstreamHTTPStatusError,
     UpstreamUnavailableError,
 )
+from investment_mcp_server.rate_limiter import RateLimiter
 from investment_mcp_server.settings import Settings
 
 
@@ -21,10 +22,14 @@ class BackendPortfolioClient:
         self,
         settings: Settings | None = None,
         async_client: httpx.AsyncClient | None = None,
+        rate_limiter: RateLimiter | None = None,
     ) -> None:
         self._settings = settings or Settings()
         self._owned_client = async_client is None
         self._client = async_client
+        self._rate_limiter = rate_limiter or RateLimiter.from_rps(
+            self._settings.portfolio_rate_limit_rps
+        )
 
     async def __aenter__(self) -> "BackendPortfolioClient":
         await self.start()
@@ -52,6 +57,7 @@ class BackendPortfolioClient:
         assert self._client is not None
 
         try:
+            await self._rate_limiter.acquire()
             response = await self._client.get("/api/portfolio")
         except httpx.RequestError as exc:
             raise UpstreamUnavailableError(
