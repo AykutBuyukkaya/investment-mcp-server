@@ -9,14 +9,10 @@ from zoneinfo import ZoneInfo
 from investment_mcp_server.errors import InputError, NoDataError, map_exception_to_error_payload
 from investment_mcp_server.fund_client import normalize_fund_code
 from investment_mcp_server.gold_client import normalize_gold_asset
+from investment_mcp_server.inflation_client import fetch_inflation_data
 from investment_mcp_server.models import FundPricePoint, GoldHistoricalBar
 from investment_mcp_server.parsers import normalize_currency_pair, normalize_ticker, parse_ohlcv_bars
-from investment_mcp_server.tools.turkey_inflation import (
-    EARLIEST_INFLATION_POINT,
-    INFLATION_BY_PERIOD,
-    INFLATION_POINTS,
-    LATEST_INFLATION_POINT,
-)
+from investment_mcp_server.tools.turkey_inflation import TurkeyInflationPoint
 
 
 MARKET_TIMEZONE = ZoneInfo("Europe/Istanbul")
@@ -128,6 +124,7 @@ def _resolve_date_range(
 def _compute_cumulative_cpi(
     start_date: str,
     end_date: str,
+    by_period: dict[str, TurkeyInflationPoint],
 ) -> tuple[float, list[dict[str, Any]], list[str]]:
     """Return (cumulative_inflation_fraction, cpi_records_used, missing_months).
 
@@ -144,7 +141,7 @@ def _compute_cumulative_cpi(
     current = start_dt
     while current <= end_month_dt:
         period_key = current.strftime(PERIOD_FORMAT)
-        point = INFLATION_BY_PERIOD.get(period_key)
+        point = by_period.get(period_key)
         if point is not None:
             cumulative *= 1 + point.monthly_percent / 100
             records_used.append(point.to_dict())
@@ -306,6 +303,14 @@ async def execute_get_real_returns(
             end_date=normalized_end,
         )
 
+        raw_cpi = await fetch_inflation_data()
+        cpi_points = [
+            TurkeyInflationPoint(period=p, annual_percent=a, monthly_percent=m)
+            for p, a, m in raw_cpi
+        ]
+        by_period = {pt.period: pt for pt in cpi_points}
+        sorted_cpi = sorted(cpi_points, key=lambda pt: pt.sort_key)
+
         asset_data = await _fetch_asset_prices(
             stock_client,
             gold_client,
@@ -326,7 +331,7 @@ async def execute_get_real_returns(
         nominal_return_percent = nominal_fraction * 100
 
         cumulative_inflation, cpi_records, missing_months = _compute_cumulative_cpi(
-            resolved_start, resolved_end
+            resolved_start, resolved_end, by_period
         )
         cumulative_inflation_percent = cumulative_inflation * 100
 
@@ -366,13 +371,13 @@ async def execute_get_real_returns(
                 "beat_inflation": beat_inflation,
                 "cpi_methodology": "monthly_compounding",
                 "cpi_dataset": {
-                    "source": "provided_static_dataset",
+                    "source": "tcmb_live",
                     "country": "Turkey",
                     "indicator": "Fiyat Endeksi (Tuketici Fiyatlari)",
                     "index_base": "2025=100",
                     "frequency": "monthly",
-                    "earliest_available_period": EARLIEST_INFLATION_POINT.period,
-                    "latest_available_period": LATEST_INFLATION_POINT.period,
+                    "earliest_available_period": sorted_cpi[0].period if sorted_cpi else None,
+                    "latest_available_period": sorted_cpi[-1].period if sorted_cpi else None,
                 },
                 "cpi_record_count": len(cpi_records),
                 "cpi_missing_months": missing_months,
