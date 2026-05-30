@@ -394,49 +394,56 @@ def create_server(
     @mcp.tool(
         name="get_turkey_inflation",
         description=(
-            "Return Turkey CPI inflation data from the supplied static dataset "
+            "Return Turkey CPI inflation data fetched live from TCMB "
             "(Fiyat Endeksi / Tuketici Fiyatlari, 2025=100). Returns annual and monthly "
-            "percentage changes. With no period arguments, returns the latest available "
-            "period. Use period for a single month or start_period/end_period for an "
-            "inclusive range. Accepted period formats: MM-YYYY or YYYY-MM. Returns a "
-            "standard envelope: {ok, data, error}."
+            "percentage changes. Set current=true for the latest period only. "
+            "Use preset (1w, 1mo, 3mo, 6mo, 1y, 5y) or explicit start_date/end_date "
+            "for a range. Returns a standard envelope: {ok, data, error}."
         ),
     )
     async def get_turkey_inflation(
-        period: str | None = Field(
-            default=None,
+        current: bool = Field(
+            default=False,
             description=(
-                "Optional single inflation period in MM-YYYY or YYYY-MM format. "
-                "Example: 04-2026 or 2026-04. Cannot be combined with start_period/end_period."
+                "If true, returns the latest available inflation period. When true, "
+                "preset, start_date, end_date, and limit are ignored and not required."
             ),
         ),
-        start_period: str | None = Field(
+        preset: str | None = Field(
             default=None,
             description=(
-                "Optional inclusive range start period in MM-YYYY or YYYY-MM format. "
-                "Must be supplied with end_period and cannot be combined with period."
+                "Optional preset window. Supported values: 1w, 1mo, 3mo, 6mo, 1y, 5y. "
+                "Cannot be combined with start_date/end_date."
             ),
         ),
-        end_period: str | None = Field(
+        start_date: str | None = Field(
             default=None,
             description=(
-                "Optional inclusive range end period in MM-YYYY or YYYY-MM format. "
-                "Must be supplied with start_period and cannot be combined with period."
+                "Optional inclusive range start date in YYYY-MM-DD format. "
+                "Must be supplied with end_date and cannot be combined with preset."
+            ),
+        ),
+        end_date: str | None = Field(
+            default=None,
+            description=(
+                "Optional inclusive range end date in YYYY-MM-DD format. "
+                "Must be supplied with start_date and cannot be combined with preset."
             ),
         ),
         limit: int | None = Field(
             default=None,
             description=(
                 "Optional maximum number of latest records to include. When used with a "
-                "range, limits to the latest records within that range. Must be greater "
-                "than 0 when set."
+                "range or preset, limits to the latest records within that window. Must be "
+                "greater than 0 when set."
             ),
         ),
     ) -> dict[str, Any]:
         return await execute_get_turkey_inflation(
-            period=period,
-            start_period=start_period,
-            end_period=end_period,
+            current=current,
+            preset=preset,
+            start_date=start_date,
+            end_date=end_date,
             limit=limit,
         )
 
@@ -582,7 +589,7 @@ def create_server(
             "currency_data_provider": "Yahoo Finance",
             "gold_data_provider": "Canli Doviz",
             "fund_data_provider": "TEFAS",
-            "turkey_inflation_data_provider": "Provided static CPI dataset",
+            "turkey_inflation_data_provider": "TCMB live CPI dataset",
             "portfolio_data_provider": "Local portfolio backend",
             "market": "BIST, foreign currencies, gold, funds, Turkey inflation, customer portfolio, multi-asset comparison, real returns",
         }
