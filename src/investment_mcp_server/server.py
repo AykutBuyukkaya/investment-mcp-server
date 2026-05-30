@@ -396,10 +396,9 @@ def create_server(
         description=(
             "Return Turkey CPI inflation data fetched live from TCMB "
             "(Fiyat Endeksi / Tuketici Fiyatlari, 2025=100). Returns annual and monthly "
-            "percentage changes. Set current=true for the latest available period only. "
-            "Use period for a single month or start_period/end_period for an inclusive "
-            "range. Accepted period formats: MM-YYYY, YYYY-MM, or YYYY-MM-DD. Returns a "
-            "standard envelope: {ok, data, error}."
+            "percentage changes. Set current=true for the latest period only. "
+            "Use preset (1w, 1mo, 3mo, 6mo, 1y, 5y) or explicit start_date/end_date "
+            "for a range. Returns a standard envelope: {ok, data, error}."
         ),
     )
     async def get_turkey_inflation(
@@ -407,45 +406,44 @@ def create_server(
             default=False,
             description=(
                 "If true, returns the latest available inflation period. When true, "
-                "period, start_period, end_period, and limit are ignored and not required."
+                "preset, start_date, end_date, and limit are ignored and not required."
             ),
         ),
-        period: str | None = Field(
+        preset: str | None = Field(
             default=None,
             description=(
-                "Optional single inflation period. Accepted formats: MM-YYYY, YYYY-MM, or "
-                "YYYY-MM-DD (day is ignored). Example: 04-2026, 2026-04, or 2026-04-01. "
-                "Cannot be combined with start_period/end_period."
+                "Optional preset window. Supported values: 1w, 1mo, 3mo, 6mo, 1y, 5y. "
+                "Cannot be combined with start_date/end_date."
             ),
         ),
-        start_period: str | None = Field(
+        start_date: str | None = Field(
             default=None,
             description=(
-                "Optional inclusive range start period. Accepted formats: MM-YYYY, YYYY-MM, "
-                "or YYYY-MM-DD. Must be supplied with end_period and cannot be combined with period."
+                "Optional inclusive range start date in YYYY-MM-DD format. "
+                "Must be supplied with end_date and cannot be combined with preset."
             ),
         ),
-        end_period: str | None = Field(
+        end_date: str | None = Field(
             default=None,
             description=(
-                "Optional inclusive range end period. Accepted formats: MM-YYYY, YYYY-MM, "
-                "or YYYY-MM-DD. Must be supplied with start_period and cannot be combined with period."
+                "Optional inclusive range end date in YYYY-MM-DD format. "
+                "Must be supplied with start_date and cannot be combined with preset."
             ),
         ),
         limit: int | None = Field(
             default=None,
             description=(
                 "Optional maximum number of latest records to include. When used with a "
-                "range, limits to the latest records within that range. Must be greater "
-                "than 0 when set."
+                "range or preset, limits to the latest records within that window. Must be "
+                "greater than 0 when set."
             ),
         ),
     ) -> dict[str, Any]:
         return await execute_get_turkey_inflation(
             current=current,
-            period=period,
-            start_period=start_period,
-            end_period=end_period,
+            preset=preset,
+            start_date=start_date,
+            end_date=end_date,
             limit=limit,
         )
 
