@@ -2,10 +2,13 @@
 
 A Python [Model Context Protocol](https://modelcontextprotocol.io) server exposing Turkish investment market data tools for AI assistants. Covers BIST equities, foreign exchange, gold, TEFAS mutual funds, Turkey CPI inflation, multi-asset return comparison, inflation-adjusted returns, and customer portfolio access — all through a single, consistent JSON envelope.
 
+**MCP endpoint:** `https://mcp.aykutbuyukkaya.com/mcp`
+
 ---
 
 ## Table of Contents
 
+- [Claude Desktop Integration](#claude-desktop-integration)
 - [Features](#features)
 - [Data Sources](#data-sources)
 - [Tools](#tools)
@@ -23,9 +26,65 @@ A Python [Model Context Protocol](https://modelcontextprotocol.io) server exposi
 - [Configuration](#configuration)
 - [Running the Server](#running-the-server)
 - [Docker](#docker)
-- [Claude Desktop Integration](#claude-desktop-integration)
 - [Development & Testing](#development--testing)
 - [Project Layout](#project-layout)
+
+---
+
+## Claude Desktop Integration
+
+The server is publicly hosted — no local installation required.
+
+### Step 1 — Locate the Claude Desktop config file
+
+| Platform | Path |
+|---|---|
+| macOS | `~/Library/Application Support/Claude/claude_desktop_config.json` |
+| Windows | `%APPDATA%\Claude\claude_desktop_config.json` |
+
+### Step 2 — Add the server entry
+
+Open `claude_desktop_config.json` (create it if it does not exist) and add the following entry under `mcpServers`:
+
+```json
+{
+  "mcpServers": {
+    "investment-mcp-server": {
+      "type": "streamable-http",
+      "url": "https://mcp.aykutbuyukkaya.com/mcp"
+    }
+  }
+}
+```
+
+### Step 3 — Restart Claude Desktop
+
+Quit and reopen Claude Desktop. The investment tools will appear in the tool list. You can verify by asking:
+
+> "What investment tools do you have available?"
+
+### Self-hosting
+
+If you prefer to run the server locally, install the package with `uv sync` and point Claude Desktop to your own instance:
+
+```json
+{
+  "mcpServers": {
+    "investment-mcp-server": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "/absolute/path/to/investment-mcp-server",
+        "run",
+        "investment-mcp-server"
+      ],
+      "env": {
+        "MCP_TRANSPORT": "stdio"
+      }
+    }
+  }
+}
+```
 
 ---
 
@@ -351,7 +410,7 @@ cp .env.example .env
 
 ```bash
 uv run investment-mcp-server
-# Endpoint: http://localhost:8000/mcp
+# Endpoint: https://mcp.aykutbuyukkaya.com/mcp
 ```
 
 **Custom host/port:**
@@ -391,89 +450,6 @@ docker run -p 9000:9000 \
   -e MCP_LOG_LEVEL=DEBUG \
   -e PORTFOLIO_BACKEND_BASE_URL=http://my-backend:6767 \
   investment-mcp-server
-```
-
----
-
-## Claude Desktop Integration
-
-### Prerequisites
-
-- [Claude Desktop](https://claude.ai/download) installed
-- Python 3.11+ and `uv` installed (`brew install uv` on macOS)
-- This repository cloned locally
-
-### Step 1 — Install the package
-
-```bash
-cd /path/to/investment-mcp-server
-uv sync
-```
-
-### Step 2 — Locate the Claude Desktop config file
-
-| Platform | Path |
-|---|---|
-| macOS | `~/Library/Application Support/Claude/claude_desktop_config.json` |
-| Windows | `%APPDATA%\Claude\claude_desktop_config.json` |
-
-### Step 3 — Add the server entry
-
-Open `claude_desktop_config.json` (create it if it does not exist) and add an entry under `mcpServers`:
-
-```json
-{
-  "mcpServers": {
-    "investment-mcp-server": {
-      "command": "uv",
-      "args": [
-        "--directory",
-        "/absolute/path/to/investment-mcp-server",
-        "run",
-        "investment-mcp-server"
-      ],
-      "env": {
-        "MCP_TRANSPORT": "stdio"
-      }
-    }
-  }
-}
-```
-
-Replace `/absolute/path/to/investment-mcp-server` with the actual path on your machine. `MCP_TRANSPORT=stdio` is required for Claude Desktop.
-
-### Step 4 — Restart Claude Desktop
-
-Quit and reopen Claude Desktop. The investment tools will appear in the tool list. You can verify by asking:
-
-> "What investment tools do you have available?"
-
-### Optional — Custom portfolio backend
-
-If you run your own portfolio backend, add it to the `env` block:
-
-```json
-"env": {
-  "MCP_TRANSPORT": "stdio",
-  "PORTFOLIO_BACKEND_BASE_URL": "http://localhost:6767"
-}
-```
-
-### Using `pip` instead of `uv`
-
-If you prefer pip, replace the `command`/`args` block:
-
-```json
-{
-  "mcpServers": {
-    "investment-mcp-server": {
-      "command": "/absolute/path/to/investment-mcp-server/.venv/bin/investment-mcp-server",
-      "env": {
-        "MCP_TRANSPORT": "stdio"
-      }
-    }
-  }
-}
 ```
 
 ---
