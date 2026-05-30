@@ -6,6 +6,12 @@ A Python [Model Context Protocol](https://modelcontextprotocol.io) server exposi
 
 ---
 
+> **Disclaimer:** This project is developed for educational and informational purposes only. The data, tools, and outputs provided by this server do not constitute financial or investment advice. Past performance of any asset is not indicative of future results. Always consult a licensed financial advisor before making any investment decisions. The author assumes no responsibility for any financial losses or decisions made based on this tool.
+>
+> **Sorumluluk Reddi:** Bu proje yalnızca eğitim ve bilgilendirme amaçlı geliştirilmiştir. Bu sunucu tarafından sağlanan veriler, araçlar ve çıktılar yatırım tavsiyesi niteliği taşımamaktadır. Herhangi bir varlığın geçmiş performansı gelecekteki sonuçların garantisi değildir. Yatırım kararı vermeden önce lisanslı bir finansal danışmana başvurmanız önerilir. Geliştirici, bu araç temel alınarak alınan kararlar veya oluşabilecek finansal kayıplar için hiçbir sorumluluk kabul etmemektedir.
+
+---
+
 ## Table of Contents
 
 - [Claude Desktop Integration](#claude-desktop-integration)
