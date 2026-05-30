@@ -394,34 +394,42 @@ def create_server(
     @mcp.tool(
         name="get_turkey_inflation",
         description=(
-            "Return Turkey CPI inflation data from the supplied static dataset "
+            "Return Turkey CPI inflation data fetched live from TCMB "
             "(Fiyat Endeksi / Tuketici Fiyatlari, 2025=100). Returns annual and monthly "
-            "percentage changes. With no period arguments, returns the latest available "
-            "period. Use period for a single month or start_period/end_period for an "
-            "inclusive range. Accepted period formats: MM-YYYY or YYYY-MM. Returns a "
+            "percentage changes. Set current=true for the latest available period only. "
+            "Use period for a single month or start_period/end_period for an inclusive "
+            "range. Accepted period formats: MM-YYYY, YYYY-MM, or YYYY-MM-DD. Returns a "
             "standard envelope: {ok, data, error}."
         ),
     )
     async def get_turkey_inflation(
+        current: bool = Field(
+            default=False,
+            description=(
+                "If true, returns the latest available inflation period. When true, "
+                "period, start_period, end_period, and limit are ignored and not required."
+            ),
+        ),
         period: str | None = Field(
             default=None,
             description=(
-                "Optional single inflation period in MM-YYYY or YYYY-MM format. "
-                "Example: 04-2026 or 2026-04. Cannot be combined with start_period/end_period."
+                "Optional single inflation period. Accepted formats: MM-YYYY, YYYY-MM, or "
+                "YYYY-MM-DD (day is ignored). Example: 04-2026, 2026-04, or 2026-04-01. "
+                "Cannot be combined with start_period/end_period."
             ),
         ),
         start_period: str | None = Field(
             default=None,
             description=(
-                "Optional inclusive range start period in MM-YYYY or YYYY-MM format. "
-                "Must be supplied with end_period and cannot be combined with period."
+                "Optional inclusive range start period. Accepted formats: MM-YYYY, YYYY-MM, "
+                "or YYYY-MM-DD. Must be supplied with end_period and cannot be combined with period."
             ),
         ),
         end_period: str | None = Field(
             default=None,
             description=(
-                "Optional inclusive range end period in MM-YYYY or YYYY-MM format. "
-                "Must be supplied with start_period and cannot be combined with period."
+                "Optional inclusive range end period. Accepted formats: MM-YYYY, YYYY-MM, "
+                "or YYYY-MM-DD. Must be supplied with start_period and cannot be combined with period."
             ),
         ),
         limit: int | None = Field(
@@ -434,6 +442,7 @@ def create_server(
         ),
     ) -> dict[str, Any]:
         return await execute_get_turkey_inflation(
+            current=current,
             period=period,
             start_period=start_period,
             end_period=end_period,
@@ -582,7 +591,7 @@ def create_server(
             "currency_data_provider": "Yahoo Finance",
             "gold_data_provider": "Canli Doviz",
             "fund_data_provider": "TEFAS",
-            "turkey_inflation_data_provider": "Provided static CPI dataset",
+            "turkey_inflation_data_provider": "TCMB live CPI dataset",
             "portfolio_data_provider": "Local portfolio backend",
             "market": "BIST, foreign currencies, gold, funds, Turkey inflation, customer portfolio, multi-asset comparison, real returns",
         }

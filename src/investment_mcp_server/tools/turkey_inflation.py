@@ -11,6 +11,7 @@ from investment_mcp_server.inflation_client import fetch_inflation_data
 
 PERIOD_FORMAT = "%m-%Y"
 ALT_PERIOD_FORMAT = "%Y-%m"
+DATE_PERIOD_FORMAT = "%Y-%m-%d"
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,14 +65,14 @@ def _normalize_period(value: str | None, *, field_name: str) -> str | None:
         raise InputError(f"{field_name} must be a non-empty period string")
 
     cleaned = value.strip()
-    for date_format in (PERIOD_FORMAT, ALT_PERIOD_FORMAT):
+    for date_format in (PERIOD_FORMAT, ALT_PERIOD_FORMAT, DATE_PERIOD_FORMAT):
         try:
             return datetime.strptime(cleaned, date_format).strftime(PERIOD_FORMAT)
         except ValueError:
             continue
 
     raise InputError(
-        f"Invalid {field_name} '{value}'. Expected format: MM-YYYY or YYYY-MM"
+        f"Invalid {field_name} '{value}'. Expected format: MM-YYYY, YYYY-MM, or YYYY-MM-DD"
     )
 
 
@@ -115,6 +116,7 @@ def _period_or_error(
 
 async def execute_get_turkey_inflation(
     *,
+    current: bool = False,
     period: str | None = None,
     start_period: str | None = None,
     end_period: str | None = None,
@@ -122,6 +124,27 @@ async def execute_get_turkey_inflation(
 ) -> dict[str, Any]:
     """Return Turkey CPI inflation data in a standard envelope."""
     try:
+        raw = await fetch_inflation_data()
+        points = _build_points(raw)
+        sorted_points = sorted(points, key=lambda p: p.sort_key)
+        by_period = {p.period: p for p in points}
+        earliest = sorted_points[0]
+        latest = sorted_points[-1]
+        meta = _dataset_metadata(earliest, latest)
+
+        if current:
+            return _make_success_response(
+                {
+                    **meta,
+                    "current": True,
+                    "period": latest.period,
+                    "annual_percent": latest.annual_percent,
+                    "monthly_percent": latest.monthly_percent,
+                    "records": [latest.to_dict()],
+                    "record_count": 1,
+                }
+            )
+
         normalized_period = _normalize_period(period, field_name="period")
         normalized_start_period = _normalize_period(start_period, field_name="start_period")
         normalized_end_period = _normalize_period(end_period, field_name="end_period")
@@ -132,14 +155,6 @@ async def execute_get_turkey_inflation(
             raise InputError("period cannot be combined with start_period or end_period")
         if (normalized_start_period is None) != (normalized_end_period is None):
             raise InputError("start_period and end_period must be provided together")
-
-        raw = await fetch_inflation_data()
-        points = _build_points(raw)
-        sorted_points = sorted(points, key=lambda p: p.sort_key)
-        by_period = {p.period: p for p in points}
-        earliest = sorted_points[0]
-        latest = sorted_points[-1]
-        meta = _dataset_metadata(earliest, latest)
 
         if normalized_period is not None:
             point = _period_or_error(normalized_period, by_period, meta)

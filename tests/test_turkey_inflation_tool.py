@@ -57,6 +57,23 @@ def test_execute_get_turkey_inflation_limit_returns_latest_records() -> None:
     )
 
 
+def test_execute_get_turkey_inflation_current_flag() -> None:
+    result = asyncio.run(execute_get_turkey_inflation(current=True))
+
+    assert result["ok"] is True
+    assert result["data"]["current"] is True
+    assert result["data"]["record_count"] == 1
+    assert isinstance(result["data"]["annual_percent"], float)
+    assert isinstance(result["data"]["period"], str)
+
+
+def test_execute_get_turkey_inflation_period_accepts_date_format() -> None:
+    result = asyncio.run(execute_get_turkey_inflation(period="2025-12-01"))
+
+    assert result["ok"] is True
+    assert result["data"]["period"] == "12-2025"
+
+
 def test_execute_get_turkey_inflation_rejects_unknown_period() -> None:
     result = asyncio.run(execute_get_turkey_inflation(period="12-2004"))
 
