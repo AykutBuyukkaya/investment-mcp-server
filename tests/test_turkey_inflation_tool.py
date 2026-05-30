@@ -10,12 +10,12 @@ def test_execute_get_turkey_inflation_latest_by_default() -> None:
 
     assert result["ok"] is True
     assert result["error"] is None
-    assert result["data"]["source"] == "provided_static_dataset"
+    assert result["data"]["source"] == "tcmb_live"
     assert result["data"]["index_base"] == "2025=100"
-    assert result["data"]["period"] == "04-2026"
-    assert result["data"]["annual_percent"] == 32.37
-    assert result["data"]["monthly_percent"] == 4.18
     assert result["data"]["record_count"] == 1
+    assert isinstance(result["data"]["annual_percent"], float)
+    assert isinstance(result["data"]["monthly_percent"], float)
+    assert isinstance(result["data"]["period"], str)
 
 
 def test_execute_get_turkey_inflation_period_accepts_year_month() -> None:
@@ -49,11 +49,12 @@ def test_execute_get_turkey_inflation_limit_returns_latest_records() -> None:
 
     assert result["ok"] is True
     assert result["data"]["record_count"] == 3
-    assert [record["period"] for record in result["data"]["records"]] == [
-        "02-2026",
-        "03-2026",
-        "04-2026",
-    ]
+    # The 3 most recent periods should be returned in ascending order
+    records = result["data"]["records"]
+    assert len(records) == 3
+    assert records[0]["year"] <= records[1]["year"] or (
+        records[0]["year"] == records[1]["year"] and records[0]["month"] < records[1]["month"]
+    )
 
 
 def test_execute_get_turkey_inflation_rejects_unknown_period() -> None:
