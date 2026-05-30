@@ -2,7 +2,7 @@
 
 A Python [Model Context Protocol](https://modelcontextprotocol.io) server exposing Turkish investment market data tools for AI assistants. Covers BIST equities, foreign exchange, gold, TEFAS mutual funds, Turkey CPI inflation, multi-asset return comparison, inflation-adjusted returns, and customer portfolio access — all through a single, consistent JSON envelope.
 
-**MCP endpoint:** `https://mcp.aykutbuyukkaya.com/mcp`
+**MCP endpoint:** `https://inv.aykutbuyukkaya.com/mcp`
 
 ---
 
@@ -51,7 +51,7 @@ Open `claude_desktop_config.json` (create it if it does not exist) and add the f
   "mcpServers": {
     "investment-mcp-server": {
       "type": "streamable-http",
-      "url": "https://mcp.aykutbuyukkaya.com/mcp"
+      "url": "https://inv.aykutbuyukkaya.com/mcp"
     }
   }
 }
@@ -410,7 +410,7 @@ cp .env.example .env
 
 ```bash
 uv run investment-mcp-server
-# Endpoint: https://mcp.aykutbuyukkaya.com/mcp
+# Endpoint: https://inv.aykutbuyukkaya.com/mcp
 ```
 
 **Custom host/port:**
