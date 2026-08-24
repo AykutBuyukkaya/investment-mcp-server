@@ -20,6 +20,7 @@ A Python [Model Context Protocol](https://modelcontextprotocol.io) server exposi
 - [Tools](#tools)
   - [get_stock_quote_metadata](#get_stock_quote_metadata)
   - [get_stock_fundamentals](#get_stock_fundamentals)
+  - [screen_bist_stocks](#screen_bist_stocks)
   - [get_stock_ohlcv_bars](#get_stock_ohlcv_bars)
   - [get_currency_ohlcv_bars](#get_currency_ohlcv_bars)
   - [get_gold_price_data](#get_gold_price_data)
@@ -59,6 +60,7 @@ You can verify by asking:
 
 - **BIST equities** — quote metadata and OHLCV candles via Yahoo Finance, with automatic `.IS` suffix normalization
 - **Stock fundamentals** — P/E, EPS, market cap, and other valuation metrics via the `yfinance` library
+- **BIST stock screener** — rank stocks by price return and PE ratio across a curated sector universe or a custom ticker list
 - **Foreign exchange** — OHLCV candles for any Yahoo FX pair (USD/TRY, EUR/TRY, …)
 - **Gold** — daily gram-gold (XAUTRY) prices from Canli Doviz
 - **TEFAS funds** — daily NAV prices with total and annualized return calculations
@@ -127,6 +129,36 @@ Fetch fundamental valuation metrics for a BIST equity via the [yfinance](https:/
 
 **Example prompt**
 > "What is THYAO's trailing P/E ratio and EPS?"
+
+---
+
+### `screen_bist_stocks`
+
+Screen BIST stocks by price return and PE ratio — answers questions like "highest price rise with lowest PE." Fetches price return over a period plus PE/EPS for each candidate ticker, excludes stocks with no usable data or a non-positive PE, and ranks the rest.
+
+**Parameters**
+
+| Name | Type | Default | Description |
+|---|---|---|---|
+| `tickers` | `array` | `null` | Optional explicit list of BIST tickers to screen (max 50). When omitted, the `sector` preset universe is used. |
+| `sector` | `string` | `financials` | Preset sector universe used only when `tickers` is omitted. See supported sectors below. |
+| `preset` | `string` | `1mo` | Preset window for the return calculation: `1w`, `1mo`, `3mo`, `6mo`, `1y`, `5y`. Defaults to `1mo`. |
+| `start_date` | `string` | `null` | Start date `YYYY-MM-DD`. Requires `end_date`. |
+| `end_date` | `string` | `null` | End date `YYYY-MM-DD`. Requires `start_date`. |
+| `pe_metric` | `string` | `trailing` | Which PE ratio to filter/rank by: `trailing` or `forward`. |
+| `max_pe` | `number` | `null` | Optional upper bound; stocks with a PE above this are excluded. |
+| `min_return_percent` | `number` | `null` | Optional lower bound; stocks with a total return below this are excluded. |
+| `sort_by` | `string` | `composite` | `composite` (blend of return-desc rank and PE-asc rank), `return` (return descending only), or `pe` (PE ascending only). |
+| `limit` | `integer` | `10` | Maximum number of ranked results to return. |
+
+**Sector presets** (curated, best-effort BIST ticker snapshots — not exhaustive or guaranteed current; pass an explicit `tickers` list for authoritative coverage): `financials`, `industrials`, `technology`, `holding_investment`, `retail_trade`, `food_beverage`, `telecommunications`, `transportation`, `energy_utilities`, `construction_materials`, `real_estate`, `health_pharma`.
+
+**Returns** — `results` (ranked tickers with return %, PE, EPS, market cap, and rank fields), `excluded` (tickers dropped for missing data or filter thresholds, with a reason), plus the resolved universe and date range.
+
+Per-ticker failures are excluded (with a reason) rather than failing the whole call.
+
+**Example prompt**
+> "What are the BIST financial stocks with the highest price rise and lowest PE this month?"
 
 ---
 

@@ -18,6 +18,7 @@ from investment_mcp_server.tools.fund_price_data import execute_get_fund_price_d
 from investment_mcp_server.tools.gold_price_data import execute_get_gold_price_data
 from investment_mcp_server.tools.gold_price_data import GoldPriceClient
 from investment_mcp_server.tools.currency_ohlcv_bars import execute_get_currency_ohlcv_bars
+from investment_mcp_server.tools.screen_bist_stocks import execute_screen_bist_stocks
 from investment_mcp_server.tools.stock_fundamentals import FundamentalsClient
 from investment_mcp_server.tools.stock_fundamentals import execute_get_stock_fundamentals
 from investment_mcp_server.tools.stock_ohlcv_bars import execute_get_stock_ohlcv_bars
@@ -59,7 +60,8 @@ def create_server(
         instructions=(
             "Investment MCP server with BIST market data tools backed by Yahoo Finance "
             "plus Yahoo Finance foreign currency data, stock fundamentals (PE, EPS, ...) "
-            "via the yfinance library, direct Canli Doviz gold data, and "
+            "via the yfinance library, a BIST stock screener that ranks tickers by price "
+            "return and PE ratio, direct Canli Doviz gold data, and "
             "direct TEFAS fund data, static Turkey CPI inflation data, plus a local "
             "customer portfolio backend integration. "
             "BIST tickers are normalized to Yahoo's .IS suffix. "
@@ -132,6 +134,100 @@ def create_server(
         return await execute_get_stock_fundamentals(
             resolved_fundamentals_client,
             ticker=ticker,
+        )
+
+    @mcp.tool(
+        name="screen_bist_stocks",
+        description=(
+            "Screen BIST stocks by price return and PE ratio, ranked to answer questions like "
+            "'highest price rise with lowest PE'. Fetches price return over a period plus PE/EPS "
+            "for each candidate ticker (via Yahoo Finance and yfinance), filters out stocks with "
+            "no usable data or a non-positive PE, and ranks the rest. Defaults to a curated BIST "
+            "sector ticker universe (see 'sector' parameter for supported sectors: financials, "
+            "industrials, technology, holding_investment, retail_trade, food_beverage, "
+            "telecommunications, transportation, energy_utilities, construction_materials, "
+            "real_estate, health_pharma) if no explicit tickers are provided; those default "
+            "lists are static best-effort snapshots and may be incomplete or outdated, so pass an "
+            "explicit tickers list for authoritative coverage. sort_by='composite' (default) ranks "
+            "by a blend of return-descending rank and PE-ascending rank; 'return' or 'pe' sort by "
+            "a single criterion. Per-ticker failures are excluded (with a reason) rather than "
+            "failing the whole call. Returns a standard envelope: {ok, data, error}."
+        ),
+    )
+    async def screen_bist_stocks(
+        tickers: list[str] | None = Field(
+            default=None,
+            description=(
+                "Optional explicit list of BIST tickers to screen (e.g. ['THYAO', 'SISE']). "
+                "Max 50. When omitted, the 'sector' preset universe is used instead."
+            ),
+        ),
+        sector: str = Field(
+            default="financials",
+            description=(
+                "Preset sector universe used only when 'tickers' is omitted. Supported values: "
+                "financials, industrials, technology, holding_investment, retail_trade, "
+                "food_beverage, telecommunications, transportation, energy_utilities, "
+                "construction_materials, real_estate, health_pharma. Each is a curated, "
+                "best-effort snapshot of well-known BIST tickers in that sector, not an "
+                "exhaustive or guaranteed-current list."
+            ),
+        ),
+        preset: str | None = Field(
+            default=None,
+            description=(
+                "Optional preset window for the return calculation: 1w, 1mo, 3mo, 6mo, 1y, 5y. "
+                "Defaults to 1mo when neither preset nor start_date/end_date is given. Cannot be "
+                "combined with start_date/end_date."
+            ),
+        ),
+        start_date: str | None = Field(
+            default=None,
+            description="Optional start date in YYYY-MM-DD format. Must be supplied with end_date.",
+        ),
+        end_date: str | None = Field(
+            default=None,
+            description="Optional end date in YYYY-MM-DD format. Must be supplied with start_date.",
+        ),
+        pe_metric: str = Field(
+            default="trailing",
+            description="Which PE ratio to filter/rank by: 'trailing' or 'forward'.",
+        ),
+        max_pe: float | None = Field(
+            default=None,
+            description="Optional upper bound; stocks with a PE above this are excluded.",
+        ),
+        min_return_percent: float | None = Field(
+            default=None,
+            description="Optional lower bound; stocks with a total return below this are excluded.",
+        ),
+        sort_by: str = Field(
+            default="composite",
+            description=(
+                "Ranking strategy: 'composite' (blend of return-desc rank and PE-asc rank, best "
+                "for 'highest rise + lowest PE' style questions), 'return' (return descending "
+                "only), or 'pe' (PE ascending only)."
+            ),
+        ),
+        limit: int = Field(
+            default=10,
+            gt=0,
+            description="Maximum number of ranked results to return.",
+        ),
+    ) -> dict[str, Any]:
+        return await execute_screen_bist_stocks(
+            resolved_stock_client,
+            resolved_fundamentals_client,
+            tickers=tickers,
+            sector=sector,
+            preset=preset,
+            start_date=start_date,
+            end_date=end_date,
+            pe_metric=pe_metric,
+            max_pe=max_pe,
+            min_return_percent=min_return_percent,
+            sort_by=sort_by,
+            limit=limit,
         )
 
     @mcp.tool(
@@ -627,7 +723,7 @@ def create_server(
             "fund_data_provider": "TEFAS",
             "turkey_inflation_data_provider": "TCMB live CPI dataset",
             "portfolio_data_provider": "Local portfolio backend",
-            "market": "BIST, foreign currencies, gold, funds, Turkey inflation, customer portfolio, multi-asset comparison, real returns",
+            "market": "BIST, foreign currencies, gold, funds, Turkey inflation, customer portfolio, multi-asset comparison, real returns, BIST stock screening",
         }
 
     @mcp.prompt()
