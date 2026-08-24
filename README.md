@@ -19,6 +19,7 @@ A Python [Model Context Protocol](https://modelcontextprotocol.io) server exposi
 - [Data Sources](#data-sources)
 - [Tools](#tools)
   - [get_stock_quote_metadata](#get_stock_quote_metadata)
+  - [get_stock_fundamentals](#get_stock_fundamentals)
   - [get_stock_ohlcv_bars](#get_stock_ohlcv_bars)
   - [get_currency_ohlcv_bars](#get_currency_ohlcv_bars)
   - [get_gold_price_data](#get_gold_price_data)
@@ -57,6 +58,7 @@ You can verify by asking:
 ## Features
 
 - **BIST equities** — quote metadata and OHLCV candles via Yahoo Finance, with automatic `.IS` suffix normalization
+- **Stock fundamentals** — P/E, EPS, market cap, and other valuation metrics via the `yfinance` library
 - **Foreign exchange** — OHLCV candles for any Yahoo FX pair (USD/TRY, EUR/TRY, …)
 - **Gold** — daily gram-gold (XAUTRY) prices from Canli Doviz
 - **TEFAS funds** — daily NAV prices with total and annualized return calculations
@@ -73,6 +75,7 @@ You can verify by asking:
 | Asset class | Provider | Notes |
 |---|---|---|
 | BIST equities | Yahoo Finance | Tickers normalized to `.IS` suffix |
+| Stock fundamentals (PE, EPS, ...) | yfinance (Yahoo Finance) | Same `.IS` ticker normalization |
 | Foreign currency | Yahoo Finance | Accepts slash, compact, or Yahoo FX symbol forms |
 | Gram gold (XAUTRY) | Canli Doviz | Direct provider API |
 | TEFAS mutual funds | TEFAS | Direct provider API |
@@ -107,6 +110,23 @@ Fetch high-level metadata for a BIST equity from Yahoo Finance.
 
 **Example prompt**
 > "What is the current price and 52-week range for THYAO?"
+
+---
+
+### `get_stock_fundamentals`
+
+Fetch fundamental valuation metrics for a BIST equity via the [yfinance](https://github.com/ranaroussi/yfinance) library.
+
+**Parameters**
+
+| Name | Type | Default | Description |
+|---|---|---|---|
+| `ticker` | `string` | required | BIST symbol. Accepts `THYAO` or `THYAO.IS`; normalized to uppercase + `.IS` suffix. |
+
+**Returns** — `trailingPE`, `forwardPE`, `trailingEps`, `forwardEps`, `marketCap`, `priceToBook`, `bookValue`, `dividendYield`, `beta`, `fiftyTwoWeekHigh`/`Low`, `returnOnEquity`, `profitMargins`, plus `symbol`, `shortName`, `currency`, `exchange`, `sector`, and `industry`.
+
+**Example prompt**
+> "What is THYAO's trailing P/E ratio and EPS?"
 
 ---
 

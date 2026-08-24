@@ -155,6 +155,54 @@ class FundPriceSummary:
 
 
 @dataclass(frozen=True, slots=True)
+class StockFundamentals:
+    symbol: str | None = None
+    short_name: str | None = None
+    currency: str | None = None
+    exchange: str | None = None
+    sector: str | None = None
+    industry: str | None = None
+    regular_market_price: float | None = None
+    market_cap: float | None = None
+    trailing_pe: float | None = None
+    forward_pe: float | None = None
+    trailing_eps: float | None = None
+    forward_eps: float | None = None
+    price_to_book: float | None = None
+    book_value: float | None = None
+    dividend_yield: float | None = None
+    beta: float | None = None
+    fifty_two_week_high: float | None = None
+    fifty_two_week_low: float | None = None
+    return_on_equity: float | None = None
+    profit_margins: float | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "symbol": self.symbol,
+            "shortName": self.short_name,
+            "currency": self.currency,
+            "exchange": self.exchange,
+            "sector": self.sector,
+            "industry": self.industry,
+            "regularMarketPrice": self.regular_market_price,
+            "marketCap": self.market_cap,
+            "trailingPE": self.trailing_pe,
+            "forwardPE": self.forward_pe,
+            "trailingEps": self.trailing_eps,
+            "forwardEps": self.forward_eps,
+            "priceToBook": self.price_to_book,
+            "bookValue": self.book_value,
+            "dividendYield": self.dividend_yield,
+            "beta": self.beta,
+            "fiftyTwoWeekHigh": self.fifty_two_week_high,
+            "fiftyTwoWeekLow": self.fifty_two_week_low,
+            "returnOnEquity": self.return_on_equity,
+            "profitMargins": self.profit_margins,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class SessionPeriod:
     timezone: str | None = None
     start: int | None = None
