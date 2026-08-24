@@ -7,6 +7,7 @@ from pydantic import Field
 
 from investment_mcp_server.settings import Settings
 from investment_mcp_server.fund_client import DirectFundClient
+from investment_mcp_server.fundamentals_client import YFinanceFundamentalsClient
 from investment_mcp_server.gold_client import DirectGoldClient
 from investment_mcp_server.rate_limiter import RateLimiter
 from investment_mcp_server.portfolio_client import BackendPortfolioClient
@@ -17,6 +18,8 @@ from investment_mcp_server.tools.fund_price_data import execute_get_fund_price_d
 from investment_mcp_server.tools.gold_price_data import execute_get_gold_price_data
 from investment_mcp_server.tools.gold_price_data import GoldPriceClient
 from investment_mcp_server.tools.currency_ohlcv_bars import execute_get_currency_ohlcv_bars
+from investment_mcp_server.tools.stock_fundamentals import FundamentalsClient
+from investment_mcp_server.tools.stock_fundamentals import execute_get_stock_fundamentals
 from investment_mcp_server.tools.stock_ohlcv_bars import execute_get_stock_ohlcv_bars
 from investment_mcp_server.tools.stock_quote_metadata import execute_get_stock_quote_metadata
 from investment_mcp_server.tools.turkey_inflation import execute_get_turkey_inflation
@@ -34,6 +37,7 @@ def create_server(
     gold_client: GoldPriceClient | None = None,
     fund_client: FundPriceClient | None = None,
     portfolio_client: PortfolioClient | None = None,
+    fundamentals_client: FundamentalsClient | None = None,
     settings: Settings | None = None,
 ) -> FastMCP:
     """Create the MCP server and register all tools/resources/prompts."""
@@ -46,12 +50,16 @@ def create_server(
         rate_limiter=RateLimiter.from_rps(resolved_settings.fund_rate_limit_rps)
     )
     resolved_portfolio_client = portfolio_client or BackendPortfolioClient(settings=resolved_settings)
+    resolved_fundamentals_client = fundamentals_client or YFinanceFundamentalsClient(
+        rate_limiter=RateLimiter.from_rps(resolved_settings.fundamentals_rate_limit_rps)
+    )
 
     mcp = FastMCP(
         name="investment-mcp-server",
         instructions=(
             "Investment MCP server with BIST market data tools backed by Yahoo Finance "
-            "plus Yahoo Finance foreign currency data, direct Canli Doviz gold data, and "
+            "plus Yahoo Finance foreign currency data, stock fundamentals (PE, EPS, ...) "
+            "via the yfinance library, direct Canli Doviz gold data, and "
             "direct TEFAS fund data, static Turkey CPI inflation data, plus a local "
             "customer portfolio backend integration. "
             "BIST tickers are normalized to Yahoo's .IS suffix. "
@@ -102,6 +110,28 @@ def create_server(
             ticker=ticker,
             include_prepost=include_prepost,
             current_price=current_price,
+        )
+
+    @mcp.tool(
+        name="get_stock_fundamentals",
+        description=(
+            "Fetch fundamental valuation metrics for a BIST equity via the yfinance library, "
+            "including trailing/forward P/E ratio, trailing/forward EPS, market cap, "
+            "price-to-book, book value, dividend yield, beta, 52-week high/low, return on "
+            "equity, and profit margins. Returns a standard envelope: {ok, data, error}."
+        ),
+    )
+    async def get_stock_fundamentals(
+        ticker: str = Field(
+            description=(
+                "Target BIST symbol. Accepts base symbol, e.g. THYAO, or explicit .IS symbol, "
+                "e.g. THYAO.IS. The server normalizes to uppercase and ensures .IS suffix."
+            )
+        ),
+    ) -> dict[str, Any]:
+        return await execute_get_stock_fundamentals(
+            resolved_fundamentals_client,
+            ticker=ticker,
         )
 
     @mcp.tool(
@@ -592,6 +622,7 @@ def create_server(
             "status": "ready",
             "stock_data_provider": "Yahoo Finance",
             "currency_data_provider": "Yahoo Finance",
+            "stock_fundamentals_data_provider": "yfinance (Yahoo Finance)",
             "gold_data_provider": "Canli Doviz",
             "fund_data_provider": "TEFAS",
             "turkey_inflation_data_provider": "TCMB live CPI dataset",
@@ -659,11 +690,15 @@ def main() -> None:
         rate_limiter=RateLimiter.from_rps(settings.fund_rate_limit_rps)
     )
     portfolio_client = BackendPortfolioClient(settings=settings)
+    fundamentals_client = YFinanceFundamentalsClient(
+        rate_limiter=RateLimiter.from_rps(settings.fundamentals_rate_limit_rps)
+    )
     server = create_server(
         stock_client=stock_client,
         gold_client=gold_client,
         fund_client=fund_client,
         portfolio_client=portfolio_client,
+        fundamentals_client=fundamentals_client,
         settings=settings,
     )
 
@@ -675,6 +710,7 @@ def main() -> None:
         _close_gold_client_sync(gold_client)
         _close_gold_client_sync(fund_client)
         _close_gold_client_sync(portfolio_client)
+        _close_gold_client_sync(fundamentals_client)
         LOGGER.info("Stock HTTP client closed")
 
 

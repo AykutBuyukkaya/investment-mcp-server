@@ -129,6 +129,14 @@ class Settings(BaseSettings):
         ),
         description="Portfolio backend requests per second.",
     )
+    fundamentals_rate_limit_rps: float = Field(
+        default=2.0,
+        gt=0,
+        validation_alias=AliasChoices(
+            "FUNDAMENTALS_RATE_LIMIT_RPS", "MCP_FUNDAMENTALS_RATE_LIMIT_RPS"
+        ),
+        description="yfinance stock fundamentals requests per second.",
+    )
 
     @field_validator("log_level")
     @classmethod
